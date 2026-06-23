@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useEditorStore } from '../stores/editorStore'
 import { useRootFolderStore } from '../stores/rootFolderStore'
 import { useThemeStore } from '../stores/themeStore'
+import { revealInFinder } from '../services/tauriFileService'
 import type { EditorCommandApi } from '../types/editorCommand'
 import { flattenFiles } from '../utils/flattenFiles'
 import { formatDisplayTime } from '../utils/formatDisplayTime'
@@ -20,11 +21,12 @@ export function EditorPane() {
   const folders = useRootFolderStore((state) => state.folders)
   const activeFolderId = useRootFolderStore((state) => state.activeFolderId)
   const createMockDocument = useRootFolderStore((state) => state.createMockDocument)
-  const { activeFileId, contents, saveStatus, openFile, updateContent, setSaveStatus, markSaved } = useEditorStore()
+  const { activeFileId, contents, saveStatus, openFile, updateContent } = useEditorStore()
+  const loadFileContent = useEditorStore((state) => state.loadFileContent)
+  const saveFileContent = useEditorStore((state) => state.saveFileContent)
   const theme = useThemeStore((state) => state.theme)
   const [editorApi, setEditorApi] = useState<EditorCommandApi | null>(null)
   const saveTimer = useRef<number | undefined>(undefined)
-  const savingTimer = useRef<number | undefined>(undefined)
 
   const allFiles = useMemo(
     () => folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id)),
@@ -34,26 +36,30 @@ export function EditorPane() {
   const content = activeFileId ? (contents[activeFileId] ?? '') : ''
 
   useEffect(() => {
+    if (!file) return
+    void loadFileContent(file.id, file.path, file.kind)
+  }, [file?.id, file?.kind, file?.path, loadFileContent])
+
+  useEffect(() => {
     if (saveStatus !== 'dirty' || !file?.editable) return
     window.clearTimeout(saveTimer.current)
     saveTimer.current = window.setTimeout(() => {
-      setSaveStatus('saving')
-      savingTimer.current = window.setTimeout(markSaved, 420)
+      void saveFileContent(file.id, file.path)
     }, 800)
     return () => window.clearTimeout(saveTimer.current)
-  }, [content, file?.editable, markSaved, saveStatus, setSaveStatus])
+  }, [content, file?.editable, file?.id, file?.path, saveFileContent, saveStatus])
 
   useEffect(() => () => {
     window.clearTimeout(saveTimer.current)
-    window.clearTimeout(savingTimer.current)
   }, [])
 
   const createDocument = () => {
-    const id = createMockDocument(activeFolderId)
-    if (id) {
-      openFile(id)
-      showToast('已新建 Markdown 笔记')
-    }
+    void createMockDocument(activeFolderId).then((id) => {
+      if (id) {
+        openFile(id)
+        showToast('已新建 Markdown 笔记')
+      }
+    })
   }
 
   return (
@@ -73,7 +79,9 @@ export function EditorPane() {
             title="在访达中打开（Mock）"
             aria-label="在访达中打开"
             disabled={!file}
-            onClick={() => file && showToast(`阶段 A Mock：在访达中显示 ${file.name}`)}
+            onClick={() => file && void revealInFinder(file.path)
+              .then(() => showToast('已在访达中显示'))
+              .catch(() => showToast(`阶段 A Mock：在访达中显示 ${file.name}`))}
           >
             <FolderOpen size={15} />
           </button>

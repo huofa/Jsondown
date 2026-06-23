@@ -1,16 +1,16 @@
-import type { EditableFile } from './file'
 import type { FileTreeNode } from './fileTree'
 
 export type DeletedFile = {
   id: string
   name: string
+  kind: 'file' | 'directory'
   originalPath: string
-  originalRootFolderId: string
+  trashPath?: string
+  originalRootFolderId?: string
   originalParentId?: string
   deletedAt: string
-  extension: string
-  kind: EditableFile['kind'] | 'directory'
-  editable: boolean
-  content: string
-  node: FileTreeNode
+  extension?: string
+  editable?: boolean
+  content?: string
+  node?: FileTreeNode
 }

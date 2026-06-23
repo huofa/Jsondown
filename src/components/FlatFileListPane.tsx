@@ -4,6 +4,11 @@ import { useEditorStore } from '../stores/editorStore'
 import { useFileListStore } from '../stores/fileListStore'
 import { useRecentlyDeletedStore } from '../stores/recentlyDeletedStore'
 import { useRootFolderStore } from '../stores/rootFolderStore'
+import {
+  isTauriRuntime,
+  moveToRecentlyDeleted as movePathToRecentlyDeleted,
+  revealInFinder,
+} from '../services/tauriFileService'
 import type { EditableFile, SortMode } from '../types/file'
 import { findParentFolderId, getDirectFilesForSelection, getFolderSelection } from '../utils/folderSelection'
 import { flattenFiles } from '../utils/flattenFiles'
@@ -23,12 +28,15 @@ export function FlatFileListPane() {
   const activeFolderId = useRootFolderStore((state) => state.activeFolderId)
   const renameFile = useRootFolderStore((state) => state.renameFile)
   const removeFile = useRootFolderStore((state) => state.removeFile)
+  const refreshRootFolder = useRootFolderStore((state) => state.refreshRootFolder)
   const selectFolder = useRootFolderStore((state) => state.selectFolder)
   const { query, sortMode, setQuery, setSortMode } = useFileListStore()
   const activeFileId = useEditorStore((state) => state.activeFileId)
   const contents = useEditorStore((state) => state.contents)
   const openFile = useEditorStore((state) => state.openFile)
   const removeContent = useEditorStore((state) => state.removeContent)
+  const closeFile = useEditorStore((state) => state.closeFile)
+  const loadRecentlyDeleted = useRecentlyDeletedStore((state) => state.loadRecentlyDeleted)
   const moveToRecentlyDeleted = useRecentlyDeletedStore((state) => state.moveToRecentlyDeleted)
   const deletedCount = useRecentlyDeletedStore((state) => state.recentlyDeletedFiles.length)
   const [sortOpen, setSortOpen] = useState(false)
@@ -132,8 +140,10 @@ export function FlatFileListPane() {
           y={menu.y}
           onClose={() => setMenu(null)}
           onOpenInFinder={() => {
-            showToast(`阶段 A Mock：在访达中显示 ${menu.file.name}`)
-            setMenu(null)
+            void revealInFinder(menu.file.path)
+              .then(() => showToast('已在访达中显示'))
+              .catch(() => showToast(`阶段 A Mock：在访达中显示 ${menu.file.name}`))
+              .finally(() => setMenu(null))
           }}
           onCopyPath={() => {
             void navigator.clipboard.writeText(menu.file.path)
@@ -143,37 +153,45 @@ export function FlatFileListPane() {
           onRename={() => {
             const name = window.prompt('重命名文件', menu.file.name)
             if (name) {
-              renameFile(menu.file.id, name)
-              showToast('阶段 A：已在内存中重命名')
+              void renameFile(menu.file.id, name).then(() => showToast('已重命名文件'))
             }
             setMenu(null)
           }}
           onDelete={() => {
-            const root = folders.find((folder) => folder.id === menu.file.rootFolderId)
-            if (!root || !menu.file.rootFolderId) return
-            const parentId = findParentFolderId(root.tree ?? [], menu.file.id)
-            moveToRecentlyDeleted({
-              id: menu.file.id,
-              name: menu.file.name,
-              originalPath: menu.file.path,
-              originalRootFolderId: menu.file.rootFolderId,
-              originalParentId: parentId,
-              deletedAt: new Date().toISOString(),
-              extension: menu.file.extension,
-              kind: menu.file.kind,
-              editable: menu.file.editable,
-              content: contents[menu.file.id] ?? '',
-              node: {
-                id: menu.file.id,
-                name: menu.file.name,
-                path: menu.file.path,
-                kind: 'file',
-                extension: menu.file.extension,
-              },
-            })
-            removeFile(menu.file.id)
-            removeContent(menu.file.id)
-            showToast('已移到最近删除（Mock）')
+            void (async () => {
+              const root = folders.find((folder) => folder.id === menu.file.rootFolderId)
+              if (!root || !menu.file.rootFolderId) return
+              const parentId = findParentFolderId(root.tree ?? [], menu.file.id)
+              if (isTauriRuntime()) {
+                await movePathToRecentlyDeleted(menu.file.path, root.path)
+                await refreshRootFolder(root.id)
+                await loadRecentlyDeleted(folders.map((folder) => folder.path))
+              } else {
+                moveToRecentlyDeleted({
+                  id: menu.file.id,
+                  name: menu.file.name,
+                  originalPath: menu.file.path,
+                  originalRootFolderId: menu.file.rootFolderId,
+                  originalParentId: parentId,
+                  deletedAt: new Date().toISOString(),
+                  extension: menu.file.extension,
+                  kind: 'file',
+                  editable: menu.file.editable,
+                  content: contents[menu.file.id] ?? '',
+                  node: {
+                    id: menu.file.id,
+                    name: menu.file.name,
+                    path: menu.file.path,
+                    kind: 'file',
+                    extension: menu.file.extension,
+                  },
+                })
+                removeFile(menu.file.id)
+              }
+              removeContent(menu.file.id)
+              if (activeFileId === menu.file.id) closeFile()
+              showToast('已移到最近删除')
+            })()
             setMenu(null)
           }}
           deleteLabel="移到最近删除"

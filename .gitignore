@@ -12,3 +12,6 @@ milkdown-main/
 npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
+
+tauri-crash.log
+jsondown-icon.png

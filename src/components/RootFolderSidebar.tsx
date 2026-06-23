@@ -11,6 +11,7 @@ import { useMemo, useState, type DragEvent, type MouseEvent } from 'react'
 import { useEditorStore } from '../stores/editorStore'
 import { useFileTreeStore } from '../stores/fileTreeStore'
 import { useRootFolderStore } from '../stores/rootFolderStore'
+import { createRootFolder, isTauriRuntime, revealInFinder } from '../services/tauriFileService'
 import type { RootFolder } from '../types/rootFolder'
 import { flattenFiles } from '../utils/flattenFiles'
 import { compactPath } from '../utils/formatDisplayTime'
@@ -26,6 +27,8 @@ export function RootFolderSidebar() {
   const {
     folders,
     activeFolderId,
+    addRootFolder,
+    addRootFolderFromDialog,
     addMockFolder,
     createMockFile,
     createMockSubfolder,
@@ -70,7 +73,7 @@ export function RootFolderSidebar() {
           <button className="icon-button" onClick={() => setNewFolderOpen(true)} title="新建资料夹">
             <FolderPlus size={17} />
           </button>
-          <button className="icon-button" onClick={() => setImportOpen(true)} title="导入文件">
+          <button className="icon-button" onClick={() => { void addRootFolderFromDialog() }} title="导入文件夹">
             <Upload size={16} />
           </button>
         </div>
@@ -150,8 +153,18 @@ export function RootFolderSidebar() {
         open={newFolderOpen}
         onClose={() => setNewFolderOpen(false)}
         onCreate={(name) => {
-          addMockFolder(name)
-          showToast(`已在桌面模拟创建“${name}”`)
+          void (async () => {
+            if (isTauriRuntime()) {
+              const parentPath = window.prompt('请输入父文件夹路径（Tauri 后续可替换为选择位置对话框）')
+              if (!parentPath) return
+              const folder = await createRootFolder(parentPath, name)
+              await addRootFolder(folder)
+              showToast(`已创建并加入“${name}”`)
+              return
+            }
+            addMockFolder(name)
+            showToast(`已在桌面模拟创建“${name}”`)
+          })()
         }}
       />
       <ImportFileDialog
@@ -159,10 +172,17 @@ export function RootFolderSidebar() {
         folderName={importTarget?.name}
         onClose={() => setImportOpen(false)}
         onImport={() => {
-          if (!importTarget) return
-          const id = importMockFile(importTarget.id)
-          if (id) openFile(id)
-          showToast('已模拟导入文件')
+          void (async () => {
+            if (isTauriRuntime()) {
+              await addRootFolderFromDialog()
+              setImportOpen(false)
+              return
+            }
+            if (!importTarget) return
+            const id = importMockFile(importTarget.id)
+            if (id) openFile(id)
+            showToast('已模拟导入文件')
+          })()
         }}
       />
       {menu && (
@@ -171,8 +191,10 @@ export function RootFolderSidebar() {
           y={menu.y}
           onClose={() => setMenu(null)}
           onOpenInFinder={() => {
-            showToast(`阶段 A Mock：在访达中打开 ${menu.folder.path}`)
-            setMenu(null)
+            void revealInFinder(menu.folder.path)
+              .then(() => showToast('已在访达中打开'))
+              .catch(() => showToast(`阶段 A Mock：在访达中打开 ${menu.folder.path}`))
+              .finally(() => setMenu(null))
           }}
           onRename={() => {
             const name = window.prompt('重命名入口', menu.folder.name)
@@ -182,17 +204,18 @@ export function RootFolderSidebar() {
           renameLabel="重命名入口名"
           onNewFolder={() => {
             const name = window.prompt('新建文件夹名称', '新建文件夹')
-            const id = createMockSubfolder(menu.folder.id, name ?? undefined)
-            if (id) showToast(`已在“${menu.folder.name}”下模拟新建文件夹`)
+            void createMockSubfolder(menu.folder.id, name ?? undefined)
+              .then((id) => { if (id) showToast(`已在“${menu.folder.name}”下新建文件夹`) })
             setMenu(null)
           }}
           onNewFile={() => {
             const name = window.prompt('新建文件名称（不写后缀默认 .md）', '新建笔记.md')
-            const id = createMockFile(menu.folder.id, name ?? undefined)
-            if (id) {
-              openFile(id)
-              showToast(`已在“${menu.folder.name}”下模拟新建文件`)
-            }
+            void createMockFile(menu.folder.id, name ?? undefined).then((id) => {
+              if (id) {
+                openFile(id)
+                showToast(`已在“${menu.folder.name}”下新建文件`)
+              }
+            })
             setMenu(null)
           }}
           onDelete={() => {
@@ -213,12 +236,12 @@ export function RootFolderSidebar() {
             setAllMenu(null)
           }}
           onImportFolder={() => {
-            addMockFolder('导入的资料夹')
-            showToast('已模拟导入文件夹并加入左栏')
+            void addRootFolderFromDialog()
             setAllMenu(null)
           }}
           onRefresh={() => {
-            showToast('已重新扫描全部文件（Mock）')
+            void useRootFolderStore.getState().refreshAllRootFolders()
+            showToast('已重新扫描全部文件')
             setAllMenu(null)
           }}
         />

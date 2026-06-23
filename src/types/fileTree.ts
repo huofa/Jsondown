@@ -5,4 +5,7 @@ export type FileTreeNode = {
   kind: 'file' | 'directory'
   extension?: string
   children?: FileTreeNode[]
+  updatedAt?: string
+  createdAt?: string
+  size?: number
 }

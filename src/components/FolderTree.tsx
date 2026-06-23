@@ -5,6 +5,11 @@ import { useFileTreeStore } from '../stores/fileTreeStore'
 import { useEditorStore } from '../stores/editorStore'
 import { useRecentlyDeletedStore } from '../stores/recentlyDeletedStore'
 import { useRootFolderStore } from '../stores/rootFolderStore'
+import {
+  isTauriRuntime,
+  moveToRecentlyDeleted as movePathToRecentlyDeleted,
+  revealInFinder,
+} from '../services/tauriFileService'
 import { isViewableFile } from '../utils/fileFilters'
 import { countViewableFiles, findParentFolderId } from '../utils/folderSelection'
 import { ContextMenu } from './ContextMenu'
@@ -36,8 +41,10 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
     createMockSubfolder,
     removeTreeNode,
     renameTreeFolder,
+    refreshRootFolder,
     selectFolder,
   } = useRootFolderStore()
+  const loadRecentlyDeleted = useRecentlyDeletedStore((state) => state.loadRecentlyDeleted)
   const moveToRecentlyDeleted = useRecentlyDeletedStore((state) => state.moveToRecentlyDeleted)
   const [menu, setMenu] = useState<{ x: number; y: number; node: FileTreeNode } | null>(null)
 
@@ -109,52 +116,63 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
           y={menu.y}
           onClose={() => setMenu(null)}
           onOpenInFinder={() => {
-            showToast(`阶段 A Mock：在访达中打开 ${menu.node.path}`)
-            setMenu(null)
+            void revealInFinder(menu.node.path)
+              .then(() => showToast('已在访达中打开'))
+              .catch(() => showToast(`阶段 A Mock：在访达中打开 ${menu.node.path}`))
+              .finally(() => setMenu(null))
           }}
           onRename={() => {
             const name = window.prompt('重命名文件夹', menu.node.name)
             if (name) {
-              renameTreeFolder(menu.node.id, name)
-              showToast('阶段 A：已在内存中重命名文件夹')
+              void renameTreeFolder(menu.node.id, name)
+                .then(() => showToast('已重命名文件夹'))
             }
             setMenu(null)
           }}
           onNewFolder={() => {
             const name = window.prompt('新建文件夹名称', '新建文件夹')
-            const id = createMockSubfolder(menu.node.id, name ?? undefined)
-            if (id) showToast(`已在“${menu.node.name}”下模拟新建文件夹`)
+            void createMockSubfolder(menu.node.id, name ?? undefined)
+              .then((id) => { if (id) showToast(`已在“${menu.node.name}”下新建文件夹`) })
             setMenu(null)
           }}
           onNewFile={() => {
             const name = window.prompt('新建文件名称（不写后缀默认 .md）', '新建笔记.md')
-            const id = createMockFile(menu.node.id, name ?? undefined)
-            if (id) {
-              openFile(id)
-              showToast(`已在“${menu.node.name}”下模拟新建文件`)
-            }
+            void createMockFile(menu.node.id, name ?? undefined).then((id) => {
+              if (id) {
+                openFile(id)
+                showToast(`已在“${menu.node.name}”下新建文件`)
+              }
+            })
             setMenu(null)
           }}
           onDelete={() => {
-            const root = folders.find((folder) => folder.id === rootFolderId)
-            if (!root || !rootFolderId) return
-            const parentId = findParentFolderId(root.tree ?? [], menu.node.id)
-            moveToRecentlyDeleted({
-              id: menu.node.id,
-              name: menu.node.name,
-              originalPath: menu.node.path,
-              originalRootFolderId: rootFolderId,
-              originalParentId: parentId,
-              deletedAt: new Date().toISOString(),
-              extension: '',
-              kind: 'directory',
-              editable: false,
-              content: '',
-              node: menu.node,
-            })
-            removeTreeNode(menu.node.id)
-            closeFile()
-            showToast('已将文件夹移到最近删除（Mock）')
+            void (async () => {
+              const root = folders.find((folder) => folder.id === rootFolderId)
+              if (!root || !rootFolderId) return
+              const parentId = findParentFolderId(root.tree ?? [], menu.node.id)
+              if (isTauriRuntime()) {
+                await movePathToRecentlyDeleted(menu.node.path, root.path)
+                await refreshRootFolder(root.id)
+                await loadRecentlyDeleted(folders.map((folder) => folder.path))
+              } else {
+                moveToRecentlyDeleted({
+                  id: menu.node.id,
+                  name: menu.node.name,
+                  originalPath: menu.node.path,
+                  originalRootFolderId: rootFolderId,
+                  originalParentId: parentId,
+                  deletedAt: new Date().toISOString(),
+                  extension: '',
+                  kind: 'directory',
+                  editable: false,
+                  content: '',
+                  node: menu.node,
+                })
+                removeTreeNode(menu.node.id)
+              }
+              closeFile()
+              showToast('已将文件夹移到最近删除')
+            })()
             setMenu(null)
           }}
           deleteLabel="移到最近删除"

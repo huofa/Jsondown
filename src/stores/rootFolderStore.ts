@@ -1,24 +1,40 @@
 import { create } from 'zustand'
 import type { FileTreeNode } from '../types/fileTree'
 import type { RootFolder } from '../types/rootFolder'
+import {
+  createChildFolder,
+  createFile,
+  isTauriRuntime,
+  loadAppConfig,
+  readDirectoryTree,
+  renamePath,
+  saveAppConfig,
+  selectRootFolder,
+} from '../services/tauriFileService'
 import { getFileKind, isEditableFile, normalizeExtension } from '../utils/fileFilters'
 import { createMockFolder, mockFileContents, mockFileMeta, mockRootFolders } from '../utils/mockFileSystem'
 
 type RootFolderState = {
   folders: RootFolder[]
   activeFolderId: string | null
+  initialized: boolean
+  initialize: () => Promise<void>
+  addRootFolderFromDialog: () => Promise<RootFolder | null>
+  addRootFolder: (folder: RootFolder) => Promise<void>
+  refreshRootFolder: (rootFolderId: string) => Promise<void>
+  refreshAllRootFolders: () => Promise<void>
   addMockFolder: (name?: string) => void
   importMockFile: (folderId: string) => string | null
-  createMockDocument: (folderId?: string | null) => string | null
-  createMockFile: (folderId: string | null | undefined, name?: string) => string | null
-  createMockSubfolder: (folderId: string | null | undefined, name?: string) => string | null
+  createMockDocument: (folderId?: string | null) => Promise<string | null>
+  createMockFile: (folderId: string | null | undefined, name?: string) => Promise<string | null>
+  createMockSubfolder: (folderId: string | null | undefined, name?: string) => Promise<string | null>
   removeFolder: (id: string) => void
   renameFolder: (id: string, name: string) => void
-  renameTreeFolder: (id: string, name: string) => void
-  renameFile: (id: string, name: string) => void
+  renameTreeFolder: (id: string, name: string) => Promise<void>
+  renameFile: (id: string, name: string) => Promise<void>
   removeFile: (id: string) => void
   removeTreeNode: (id: string) => void
-  restoreFile: (rootFolderId: string, parentId: string | undefined, node: NonNullable<RootFolder['tree']>[number]) => void
+  restoreFile: (rootFolderId: string, parentId: string | undefined, node: FileTreeNode) => void
   selectFolder: (id: string) => void
   reorderFolders: (sourceId: string, targetId: string) => void
 }
@@ -65,15 +81,92 @@ const removeNodeById = (nodes: FileTreeNode[], id: string): FileTreeNode[] =>
     .filter((node) => node.id !== id)
     .map((node) => node.children ? { ...node, children: removeNodeById(node.children, id) } : node)
 
-export const useRootFolderStore = create<RootFolderState>((set) => ({
-  folders: mockRootFolders,
-  activeFolderId: mockRootFolders[0]?.id ?? null,
+const findNodeById = (nodes: FileTreeNode[], id: string): FileTreeNode | null => {
+  for (const node of nodes) {
+    if (node.id === id) return node
+    if (node.children) {
+      const found = findNodeById(node.children, id)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+const findRootForSelection = (folders: RootFolder[], id?: string | null) => {
+  if (!id || id === 'all' || id === 'recently-deleted') return folders[0]
+  const direct = folders.find((folder) => folder.id === id)
+  if (direct) return direct
+  return folders.find((folder) => Boolean(findNodeById(folder.tree ?? [], id)))
+}
+
+const findPathForSelection = (folders: RootFolder[], id?: string | null) => {
+  if (!id || id === 'all' || id === 'recently-deleted') return folders[0]?.path
+  const root = folders.find((folder) => folder.id === id)
+  if (root) return root.path
+  for (const folder of folders) {
+    const node = findNodeById(folder.tree ?? [], id)
+    if (node?.kind === 'directory') return node.path
+  }
+  return folders[0]?.path
+}
+
+const saveFolders = (folders: RootFolder[], activeFolderId: string | null) => {
+  void saveAppConfig({
+    rootFolders: folders.map((folder, order) => ({ ...folder, order, tree: undefined })),
+    selectedRootFolderId: activeFolderId ?? undefined,
+  })
+}
+
+const refreshFolder = async (folder: RootFolder): Promise<RootFolder> => ({
+  ...folder,
+  tree: await readDirectoryTree(folder.path),
+})
+
+export const useRootFolderStore = create<RootFolderState>((set, get) => ({
+  folders: isTauriRuntime() ? [] : mockRootFolders,
+  activeFolderId: isTauriRuntime() ? null : mockRootFolders[0]?.id ?? null,
+  initialized: false,
+  initialize: async () => {
+    const config = await loadAppConfig()
+    const hydrated = await Promise.all((config.rootFolders ?? []).map(refreshFolder))
+    set({
+      folders: hydrated,
+      activeFolderId: config.selectedRootFolderId ?? hydrated[0]?.id ?? 'all',
+      initialized: true,
+    })
+  },
+  addRootFolderFromDialog: async () => {
+    const folder = await selectRootFolder()
+    if (!folder) return null
+    await get().addRootFolder(folder)
+    return folder
+  },
+  addRootFolder: async (folder) => {
+    const withOrder = { ...folder, order: get().folders.length }
+    const hydrated = await refreshFolder(withOrder)
+    const folders = [...get().folders.filter((item) => item.path !== hydrated.path), hydrated]
+      .map((item, order) => ({ ...item, order }))
+    set({ folders, activeFolderId: hydrated.id })
+    saveFolders(folders, hydrated.id)
+  },
+  refreshRootFolder: async (rootFolderId) => {
+    const folders = await Promise.all(get().folders.map(async (folder) =>
+      folder.id === rootFolderId ? refreshFolder(folder) : folder,
+    ))
+    set({ folders })
+  },
+  refreshAllRootFolders: async () => {
+    const folders = await Promise.all(get().folders.map(refreshFolder))
+    set({ folders })
+  },
   addMockFolder: (name) =>
     set((state) => {
       const folder = createMockFolder(state.folders.length + 1, name?.trim() || undefined)
       const note = folder.tree?.[0]
       if (note) mockFileContents[note.id] = '# 未命名笔记\n\n从这里开始写。'
-      return { folders: [...state.folders, folder], activeFolderId: folder.id }
+      const folders = [...state.folders, folder]
+      saveFolders(folders, folder.id)
+      return { folders, activeFolderId: folder.id }
     }),
   importMockFile: (folderId) => {
     let createdId: string | null = null
@@ -97,32 +190,20 @@ export const useRootFolderStore = create<RootFolderState>((set) => ({
     }))
     return createdId
   },
-  createMockDocument: (folderId) => {
-    let createdId: string | null = null
-    set((state) => {
-      const targetId = folderId && folderId !== 'all' ? folderId : state.folders[0]?.id
-      return {
-        folders: state.folders.map((folder) => {
-          if (folder.id !== targetId) return folder
-          createdId = `file-note-${Date.now()}`
-          const name = '新建笔记.md'
-          mockFileContents[createdId] = '# 新建笔记\n\n'
-          return {
-            ...folder,
-            tree: [{
-              id: createdId,
-              name,
-              path: `${folder.path}/${name}`,
-              kind: 'file' as const,
-              extension: 'md',
-            }, ...(folder.tree ?? [])],
-          }
-        }),
-      }
-    })
-    return createdId
-  },
-  createMockFile: (folderId, rawName) => {
+  createMockDocument: async (folderId) => get().createMockFile(folderId, '新建笔记.md'),
+  createMockFile: async (folderId, rawName) => {
+    const folders = get().folders
+    const root = findRootForSelection(folders, folderId)
+    const parentPath = findPathForSelection(folders, folderId)
+    if (!root || !parentPath) return null
+
+    if (isTauriRuntime()) {
+      const node = await createFile(parentPath, rawName ?? '新建笔记.md')
+      await get().refreshRootFolder(root.id)
+      set({ activeFolderId: folderId && folderId !== 'all' ? folderId : root.id })
+      return node.id
+    }
+
     let createdId: string | null = null
     const name = fileNameFor(rawName)
     const extension = extensionFor(name)
@@ -157,21 +238,27 @@ export const useRootFolderStore = create<RootFolderState>((set) => ({
     }))
     return createdId
   },
-  createMockSubfolder: (folderId, rawName) => {
-    let createdId: string | null = null
+  createMockSubfolder: async (folderId, rawName) => {
+    const folders = get().folders
+    const root = findRootForSelection(folders, folderId)
+    const parentPath = findPathForSelection(folders, folderId)
+    if (!root || !parentPath) return null
     const name = rawName?.trim() || '新建文件夹'
+
+    if (isTauriRuntime()) {
+      const node = await createChildFolder(parentPath, name)
+      await get().refreshRootFolder(root.id)
+      set({ activeFolderId: node.id })
+      return node.id
+    }
+
+    let createdId: string | null = null
     set((state) => ({
       folders: state.folders.map((folder) => {
         const makeNode = (parentPath: string): FileTreeNode => {
           const id = uniqueId('dir-new')
           createdId = id
-          return {
-            id,
-            name,
-            path: `${parentPath}/${name}`,
-            kind: 'directory',
-            children: [],
-          }
+          return { id, name, path: `${parentPath}/${name}`, kind: 'directory', children: [] }
         }
 
         if (!folderId || folderId === 'all' || folder.id === folderId) {
@@ -189,18 +276,26 @@ export const useRootFolderStore = create<RootFolderState>((set) => ({
   removeFolder: (id) =>
     set((state) => {
       const folders = state.folders.filter((folder) => folder.id !== id)
-      return {
-        folders,
-        activeFolderId:
-          state.activeFolderId === id ? (folders[0]?.id ?? null) : state.activeFolderId,
-      }
+      const activeFolderId = state.activeFolderId === id ? (folders[0]?.id ?? 'all') : state.activeFolderId
+      saveFolders(folders, activeFolderId)
+      return { folders, activeFolderId }
     }),
   renameFolder: (id, name) =>
-    set((state) => ({
-      folders: state.folders.map((folder) =>
-        folder.id === id ? { ...folder, name: name.trim() || folder.name } : folder),
-    })),
-  renameTreeFolder: (id, name) =>
+    set((state) => {
+      const folders = state.folders.map((folder) =>
+        folder.id === id ? { ...folder, name: name.trim() || folder.name } : folder)
+      saveFolders(folders, state.activeFolderId)
+      return { folders }
+    }),
+  renameTreeFolder: async (id, name) => {
+    const root = findRootForSelection(get().folders, id)
+    const node = root ? findNodeById(root.tree ?? [], id) : null
+    if (!root || !node) return
+    if (isTauriRuntime()) {
+      await renamePath(node.path, name)
+      await get().refreshRootFolder(root.id)
+      return
+    }
     set((state) => {
       const renameNodes = (nodes: FileTreeNode[]): FileTreeNode[] =>
         nodes.map((node) => {
@@ -210,16 +305,20 @@ export const useRootFolderStore = create<RootFolderState>((set) => ({
           }
           return node.children ? { ...node, children: renameNodes(node.children) } : node
         })
-      return {
-        folders: state.folders.map((folder) => ({
-          ...folder,
-          tree: renameNodes(folder.tree ?? []),
-        })),
-      }
-    }),
-  renameFile: (id, name) =>
+      return { folders: state.folders.map((folder) => ({ ...folder, tree: renameNodes(folder.tree ?? []) })) }
+    })
+  },
+  renameFile: async (id, name) => {
+    const root = findRootForSelection(get().folders, id)
+    const node = root ? findNodeById(root.tree ?? [], id) : null
+    if (!root || !node) return
+    if (isTauriRuntime()) {
+      await renamePath(node.path, name)
+      await get().refreshRootFolder(root.id)
+      return
+    }
     set((state) => {
-      const renameNodes = (nodes: NonNullable<RootFolder['tree']>): NonNullable<RootFolder['tree']> =>
+      const renameNodes = (nodes: FileTreeNode[]): FileTreeNode[] =>
         nodes.map((node) => {
           if (node.id === id) {
             const parent = node.path.slice(0, node.path.lastIndexOf('/'))
@@ -227,35 +326,21 @@ export const useRootFolderStore = create<RootFolderState>((set) => ({
           }
           return node.children ? { ...node, children: renameNodes(node.children) } : node
         })
-      return {
-        folders: state.folders.map((folder) => ({
-          ...folder,
-          tree: renameNodes(folder.tree ?? []),
-        })),
-      }
-    }),
+      return { folders: state.folders.map((folder) => ({ ...folder, tree: renameNodes(folder.tree ?? []) })) }
+    })
+  },
   removeFile: (id) =>
-    set((state) => {
-      return {
-        folders: state.folders.map((folder) => ({
-          ...folder,
-          tree: removeNodeById(folder.tree ?? [], id),
-        })),
-      }
-    }),
+    set((state) => ({
+      folders: state.folders.map((folder) => ({ ...folder, tree: removeNodeById(folder.tree ?? [], id) })),
+    })),
   removeTreeNode: (id) =>
     set((state) => ({
-      folders: state.folders.map((folder) => ({
-        ...folder,
-        tree: removeNodeById(folder.tree ?? [], id),
-      })),
+      folders: state.folders.map((folder) => ({ ...folder, tree: removeNodeById(folder.tree ?? [], id) })),
       activeFolderId: state.activeFolderId === id ? 'all' : state.activeFolderId,
     })),
   restoreFile: (rootFolderId, parentId, node) =>
     set((state) => {
-      const addToParent = (
-        nodes: NonNullable<RootFolder['tree']>,
-      ): { nodes: NonNullable<RootFolder['tree']>; restored: boolean } => {
+      const addToParent = (nodes: FileTreeNode[]): { nodes: FileTreeNode[]; restored: boolean } => {
         let restored = false
         const result = nodes.map((item) => {
           if (item.id === parentId && item.kind === 'directory') {
@@ -288,6 +373,9 @@ export const useRootFolderStore = create<RootFolderState>((set) => ({
       if (from < 0 || to < 0 || from === to) return state
       const [moved] = folders.splice(from, 1)
       folders.splice(to, 0, moved)
-      return { folders: folders.map((folder, order) => ({ ...folder, order })) }
+      const ordered = folders.map((folder, order) => ({ ...folder, order }))
+      saveFolders(ordered, state.activeFolderId)
+      return { folders: ordered }
     }),
 }))
+

@@ -1,81 +1,84 @@
-# Jsondown Editor V0.5
+# Jsondown V1.0
 
-Jsondown 是一个采用 React、TypeScript、Vite 与 Milkdown/Crepe 构建的本地 Markdown 富文本编辑器原型。当前仍处于阶段 A：使用 Mock 文件系统验证三栏备忘录式交互、文件浏览、富文本编辑、自动保存、文件夹逻辑与安全删除语义。
+Jsondown 是一个采用 React、TypeScript、Vite、Tauri 与 Milkdown/Crepe 构建的本地 Markdown 富文本编辑器。V1.0 主线目标是从前端 Mock 原型升级为真实本地文件系统版本：真实文件夹入口、真实文件树扫描、真实文件读写、Finder 打开、文件监听和安全最近删除。
 
-## 启动
+## 安装与启动
+
+推荐使用 pnpm：
+
+```bash
+pnpm install
+pnpm tauri dev
+pnpm tauri build
+```
+
+当前仓库仍保留 npm lock，本机没有 pnpm 时也可以使用：
 
 ```bash
 npm install
-npm run dev
+npm run tauri:dev
+npm run tauri:build
 ```
 
-生产构建：
+只运行网页验证层：
 
 ```bash
-npm run build
-npm run preview
+npm run dev
+npm run build:web
 ```
 
 ## 当前实现
 
 - macOS 备忘录式三栏布局，左右分隔条可拖动调宽。
 - 右栏使用 Milkdown/Crepe 作为唯一 Markdown 编辑器内核。
-- `.md` / `.markdown` 可编辑，其他支持类型以只读代码或图片方式查看。
-- 800ms debounce Mock 自动保存，并显示保存状态。
-- 顶部轻量富文本工具栏，支持标题 1–6、加粗、斜体、列表、链接、图片、表格、代码块等常用命令。
-- 左栏支持“全部文件”、主文件夹、次级文件夹、最近删除。
-- “全部文件”和普通主文件夹同级，点击后递归显示所有可打开文件。
-- 普通主文件夹 / 次级文件夹模式下，中栏只显示当前文件夹直属文件，不递归混入子文件夹文件。
-- “全部文件”模式下，文件卡片显示直接上级文件夹名称；普通文件夹模式下不重复显示文件夹名称。
-- 左栏文件夹行统一为 `[展开/占位] [图标] [名称] [更多] [计数]`，名称左对齐、计数右对齐。
-- 支持紧凑、舒适、宽松、自定义四种排版密度入口。
-- 支持左栏折叠，折叠后保留中栏和右栏。
-- 最近删除使用前端 Mock，可恢复或永久删除 Mock 项目。
+- `.md` / `.markdown` 可编辑，其他支持类型以只读代码或图片占位方式查看。
+- Tauri 2 桌面壳已接入。
+- 支持选择真实本地文件夹作为 RootFolder 入口。
+- 支持读取真实目录树，并过滤 `.git`、`node_modules`、`dist`、`build`、`.DS_Store`、`target`、`.next`、`.vite`、`coverage`、`.jsondown-trash` 等目录或文件。
+- 支持真实读取文本文件。
+- 支持 Markdown 自动保存写回原文件。
+- 支持真实新建文件、次级文件夹、重命名文件或次级文件夹。
+- 支持在 macOS Finder 中打开或定位文件。
+- 支持将 RootFolder 内部文件 / 次级文件夹移动到 `.jsondown-trash/`。
+- 支持读取所有 root folders 的 `trash-index.json` 并在最近删除中展示。
+- 支持恢复最近删除项目。
+- 支持永久删除最近删除项目，前端会二次确认。
+- 支持基础文件监听，并在外部变化后刷新文件树；当前打开文件变化时标记 `external-changed`。
 
-## V0.5 重点
+## 文件安全协议
 
-V0.5 主要补齐文件夹菜单、安全删除语义和左栏对齐体系：
-
-- 主文件夹入口是 Jsondown 的“入口壳子”，删除时只“移除入口”，不删除本地真实文件，也不进入最近删除。
-- 次级文件夹和文件属于真实内容层，删除动作统一表达为“移到最近删除”。
-- 主文件夹菜单包含：
-  - 在访达中打开
-  - 重命名入口名
-  - 新建文件夹
-  - 新建文件
-  - 移除入口
-- 次级文件夹菜单包含：
-  - 在访达中打开
-  - 重命名
-  - 新建文件夹
-  - 新建文件
-  - 移到最近删除
-- “全部文件”菜单包含：
-  - 新建文件夹
-  - 导入文件夹
-  - 刷新全部文件
-- 新建文件时，如果输入带后缀则按输入后缀创建；如果不带后缀，默认创建 `.md`。
-- 次级文件夹可进入最近删除 Mock，并在最近删除中显示为目录项。
-
-## 当前仍是 Mock 的能力
-
-- 添加 / 导入文件夹。
-- 在访达中打开。
-- 新建文件 / 文件夹。
-- 重命名文件 / 文件夹。
-- 移到最近删除、恢复、永久删除。
-- 文件内容保存。
-- 文件监听与外部变更检测。
-
-## 阶段 B / Tauri 接入建议
-
-V1.0 接入 Tauri 时建议保持这套安全协议：
-
-- RootFolder 主文件夹入口只写入 Jsondown 配置；移除入口不碰真实文件。
-- ChildFolder / File 删除时移动到对应 root folder 下的 `.jsondown-trash/`。
-- `.jsondown-trash/trash-index.json` 记录 `originalPath`、`trashPath`、`deletedAt`、`kind` 等信息。
-- 恢复时优先回到原路径；如原路径已有同名项目，默认重命名恢复，避免覆盖。
+- RootFolder 主文件夹入口只是 Jsondown 的配置入口。
+- 移除 RootFolder 入口只删除 app config 中的入口，不删除真实本地文件夹，不进入最近删除。
+- RootFolder 内部的文件和次级文件夹属于真实内容层。
+- 删除真实内容时不会直接永久删除，而是移动到该 root folder 下的 `.jsondown-trash/`。
+- `.jsondown-trash/trash-index.json` 记录原路径、trash 路径、删除时间和类型。
+- 恢复时优先回到原路径；如果原路径已有同名项目，会自动用“_恢复”命名避免覆盖。
 - 永久删除必须二次确认。
-- Tauri dialog 负责选择文件夹 / 文件，Rust fs 负责真实扫描、读写、移动、恢复与监听。
 
-Markdown 格式折叠菜单、JSON/HTML code block 增强和更复杂的编辑体验增强，建议放到 Tauri 主线稳定之后继续推进。
+## V1.0 Rust commands
+
+- `select_root_folder`
+- `create_root_folder`
+- `read_directory_tree`
+- `read_text_file`
+- `write_text_file`
+- `reveal_in_finder`
+- `load_app_config`
+- `save_app_config`
+- `create_child_folder`
+- `create_file`
+- `rename_path`
+- `move_to_recently_deleted`
+- `list_recently_deleted`
+- `restore_deleted_file`
+- `permanently_delete_trash_item`
+- `watch_paths`
+
+## 仍然保留或尚未完成
+
+- 网页版仍保留 Mock fallback，便于继续做 UI 验证。
+- 新建 RootFolder 的“选择父位置”目前前端仍用路径输入占位，后续可以补一个专门的父目录选择 command。
+- 图片预览在 Tauri 下可以继续升级为 `convertFileSrc` 或自定义 asset protocol。
+- 文件监听是基础版，复杂 rename / 批量变更边界后续继续增强。
+- JSON block、HTML inline preview、纸张主题精修、MD 快捷菜单和包体积优化不在 V1.0 范围内。
+
