@@ -13,6 +13,8 @@ import { SaveStatus } from './SaveStatus'
 import { ThemeSwitcher } from './ThemeSwitcher'
 import { ToastHost, showToast } from './Toast'
 import { TopEditorToolbar } from './TopEditorToolbar'
+import { LayoutDensitySwitcher } from './LayoutDensitySwitcher'
+import { SidebarCollapseButton } from './SidebarCollapseButton'
 
 export function EditorPane() {
   const folders = useRootFolderStore((state) => state.folders)
@@ -57,12 +59,14 @@ export function EditorPane() {
   return (
     <div className={`editor-shell ${theme}`}>
       <header className="editor-header">
+        <SidebarCollapseButton />
         <button className="new-document-button" onClick={createDocument} title="新建文档" aria-label="新建文档">
           <SquarePen size={15} />
         </button>
         <TopEditorToolbar api={editorApi} disabled={!file?.editable} />
         <div className="editor-actions">
           {file?.editable && <SaveStatus status={saveStatus} />}
+          <LayoutDensitySwitcher />
           <ThemeSwitcher />
           <button
             className="icon-button"

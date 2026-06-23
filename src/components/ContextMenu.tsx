@@ -10,6 +10,7 @@ type ContextMenuProps = {
   onCopyPath?: () => void
   onRename?: () => void
   onDelete?: () => void
+  deleteLabel?: string
 }
 
 export function ContextMenu({
@@ -20,6 +21,7 @@ export function ContextMenu({
   onCopyPath,
   onRename,
   onDelete,
+  deleteLabel = '删除入口',
 }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null)
 
@@ -40,7 +42,7 @@ export function ContextMenu({
       <button onClick={onOpenInFinder}><ExternalLink size={14} />在访达中打开</button>
       {onCopyPath && <button onClick={onCopyPath}><Clipboard size={14} />复制路径</button>}
       {onRename && <button onClick={onRename}><Pencil size={14} />重命名</button>}
-      {onDelete && <button className="danger" onClick={onDelete}><Trash2 size={14} />删除入口</button>}
+      {onDelete && <button className="danger" onClick={onDelete}><Trash2 size={14} />{deleteLabel}</button>}
     </div>,
     document.body,
   )

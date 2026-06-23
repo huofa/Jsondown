@@ -19,6 +19,7 @@ import { ContextMenu } from './ContextMenu'
 import { FolderTree } from './FolderTree'
 import { ImportFileDialog } from './ImportFileDialog'
 import { NewFolderDialog } from './NewFolderDialog'
+import { RecentlyDeletedEntry } from './RecentlyDeletedEntry'
 import { showToast } from './Toast'
 
 export function RootFolderSidebar() {
@@ -73,7 +74,7 @@ export function RootFolderSidebar() {
 
       <div className="sidebar-scroll">
         <button
-          className={`all-files-row ${activeFolderId === 'all' ? 'is-active' : ''}`}
+          className={`system-folder-row all-files-row ${activeFolderId === 'all' ? 'is-active' : ''}`}
           onClick={() => selectFolder('all')}
         >
           <Files size={16} />
@@ -125,6 +126,7 @@ export function RootFolderSidebar() {
             )
           })}
         </div>
+        <RecentlyDeletedEntry />
       </div>
 
       <NewFolderDialog

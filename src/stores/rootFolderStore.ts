@@ -11,6 +11,8 @@ type RootFolderState = {
   removeFolder: (id: string) => void
   renameFolder: (id: string, name: string) => void
   renameFile: (id: string, name: string) => void
+  removeFile: (id: string) => void
+  restoreFile: (rootFolderId: string, parentId: string | undefined, node: NonNullable<RootFolder['tree']>[number]) => void
   selectFolder: (id: string) => void
   reorderFolders: (sourceId: string, targetId: string) => void
 }
@@ -101,6 +103,47 @@ export const useRootFolderStore = create<RootFolderState>((set) => ({
           ...folder,
           tree: renameNodes(folder.tree ?? []),
         })),
+      }
+    }),
+  removeFile: (id) =>
+    set((state) => {
+      const removeFromNodes = (nodes: NonNullable<RootFolder['tree']>): NonNullable<RootFolder['tree']> =>
+        nodes
+          .filter((node) => node.id !== id)
+          .map((node) => node.children ? { ...node, children: removeFromNodes(node.children) } : node)
+      return {
+        folders: state.folders.map((folder) => ({
+          ...folder,
+          tree: removeFromNodes(folder.tree ?? []),
+        })),
+      }
+    }),
+  restoreFile: (rootFolderId, parentId, node) =>
+    set((state) => {
+      const addToParent = (
+        nodes: NonNullable<RootFolder['tree']>,
+      ): { nodes: NonNullable<RootFolder['tree']>; restored: boolean } => {
+        let restored = false
+        const result = nodes.map((item) => {
+          if (item.id === parentId && item.kind === 'directory') {
+            restored = true
+            return { ...item, children: [node, ...(item.children ?? [])] }
+          }
+          if (!item.children) return item
+          const childResult = addToParent(item.children)
+          restored ||= childResult.restored
+          return { ...item, children: childResult.nodes }
+        })
+        return { nodes: result, restored }
+      }
+
+      return {
+        folders: state.folders.map((folder) => {
+          if (folder.id !== rootFolderId) return folder
+          if (!parentId) return { ...folder, tree: [node, ...(folder.tree ?? [])] }
+          const result = addToParent(folder.tree ?? [])
+          return { ...folder, tree: result.restored ? result.nodes : [node, ...(folder.tree ?? [])] }
+        }),
       }
     }),
   selectFolder: (id) => set({ activeFolderId: id }),

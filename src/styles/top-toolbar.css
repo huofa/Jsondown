@@ -44,3 +44,21 @@
   cursor: pointer;
 }
 .heading-select:disabled { color: #b9b4ad; }
+
+.density-switcher { position: relative; }
+.density-switcher > button {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 25px;
+  padding: 0 7px;
+  border: 1px solid rgba(92,82,68,.1);
+  border-radius: 13px;
+  color: #827b72;
+  background: rgba(255,255,255,.38);
+  font-size: 8.5px;
+  cursor: pointer;
+}
+.density-menu { position: absolute; z-index: 50; top: 30px; right: 0; width: 92px; padding: 4px; border: 1px solid #ded8cf; border-radius: 8px; background: rgba(255,255,255,.97); box-shadow: 0 10px 28px rgba(55,47,39,.14); }
+.density-menu button { width: 100%; padding: 6px 8px; border: 0; border-radius: 5px; color: #686159; background: transparent; font-size: 10px; text-align: left; cursor: pointer; }
+.density-menu button:hover, .density-menu button.is-active { background: #eeeae4; }

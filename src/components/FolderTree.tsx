@@ -9,6 +9,7 @@ type FolderTreeProps = {
   nodes: FileTreeNode[]
   depth?: number
   rootFolderId?: string
+  parentFolderId?: string
 }
 
 function TreeFileIcon({ extension }: { extension?: string }) {
@@ -17,11 +18,13 @@ function TreeFileIcon({ extension }: { extension?: string }) {
   return <File size={14} />
 }
 
-export function FolderTree({ nodes, depth = 0, rootFolderId }: FolderTreeProps) {
+export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: FolderTreeProps) {
   const expandedIds = useFileTreeStore((state) => state.expandedIds)
   const toggleExpanded = useFileTreeStore((state) => state.toggleExpanded)
   const activeFileId = useEditorStore((state) => state.activeFileId)
   const openFile = useEditorStore((state) => state.openFile)
+  const activeFolderId = useRootFolderStore((state) => state.activeFolderId)
+  const selectFolder = useRootFolderStore((state) => state.selectFolder)
 
   return (
     <div className="folder-tree" role={depth === 0 ? 'tree' : 'group'}>
@@ -31,16 +34,26 @@ export function FolderTree({ nodes, depth = 0, rootFolderId }: FolderTreeProps) 
           return (
             <div key={node.id}>
               <button
-                className="tree-row"
+                className={`tree-row ${activeFolderId === node.id ? 'is-folder-active' : ''}`}
                 style={{ paddingLeft: 10 + depth * 14 }}
-                onClick={() => toggleExpanded(node.id)}
+                onClick={() => {
+                  selectFolder(node.id)
+                  toggleExpanded(node.id)
+                }}
                 aria-expanded={expanded}
               >
                 {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                 {expanded ? <FolderOpen size={15} /> : <Folder size={15} />}
                 <span>{node.name}</span>
               </button>
-              {expanded && <FolderTree nodes={node.children ?? []} depth={depth + 1} rootFolderId={rootFolderId} />}
+              {expanded && (
+                <FolderTree
+                  nodes={node.children ?? []}
+                  depth={depth + 1}
+                  rootFolderId={rootFolderId}
+                  parentFolderId={node.id}
+                />
+              )}
             </div>
           )
         }
@@ -52,7 +65,7 @@ export function FolderTree({ nodes, depth = 0, rootFolderId }: FolderTreeProps) 
             className={`tree-row tree-file ${activeFileId === node.id ? 'is-active' : ''}`}
             style={{ paddingLeft: 27 + depth * 14 }}
             onClick={() => {
-              if (rootFolderId) useRootFolderStore.getState().selectFolder(rootFolderId)
+              selectFolder(parentFolderId ?? rootFolderId ?? 'all')
               openFile(node.id)
             }}
             title={node.path}

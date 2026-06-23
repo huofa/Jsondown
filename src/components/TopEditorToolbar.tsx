@@ -64,6 +64,9 @@ export function TopEditorToolbar({ api, disabled }: TopEditorToolbarProps) {
         <option value="1">标题 1</option>
         <option value="2">标题 2</option>
         <option value="3">标题 3</option>
+        <option value="4">标题 4</option>
+        <option value="5">标题 5</option>
+        <option value="6">标题 6</option>
       </select>
       <div className="toolbar-separator" />
       <div className="toolbar-group">

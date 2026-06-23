@@ -1,4 +1,5 @@
 import { type PointerEvent, type ReactNode, useRef, useState } from 'react'
+import { useUiStore } from '../stores/uiStore'
 
 type ResizablePanelsProps = {
   left: ReactNode
@@ -7,6 +8,7 @@ type ResizablePanelsProps = {
 }
 
 export function ResizablePanels({ left, middle, right }: ResizablePanelsProps) {
+  const collapsed = useUiStore((state) => state.isRootSidebarCollapsed)
   const [leftWidth, setLeftWidth] = useState(244)
   const [middleWidth, setMiddleWidth] = useState(326)
   const drag = useRef<{ panel: 'left' | 'middle'; x: number; width: number } | null>(null)
@@ -45,9 +47,9 @@ export function ResizablePanels({ left, middle, right }: ResizablePanelsProps) {
   )
 
   return (
-    <main className="panel-layout">
-      <section className="panel panel-left" style={{ width: leftWidth }}>{left}</section>
-      {divider('left')}
+    <main className={`panel-layout ${collapsed ? 'is-sidebar-collapsed' : ''}`}>
+      <section className="panel panel-left" style={{ width: collapsed ? 0 : leftWidth }}>{left}</section>
+      {!collapsed && divider('left')}
       <section className="panel panel-middle" style={{ width: middleWidth }}>{middle}</section>
       {divider('middle')}
       <section className="panel panel-right">{right}</section>

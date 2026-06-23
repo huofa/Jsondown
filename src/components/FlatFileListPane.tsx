@@ -1,12 +1,15 @@
-import { Check, ChevronDown, Search } from 'lucide-react'
+import { Check, ChevronDown, Folder as FolderIcon, Search } from 'lucide-react'
 import { useMemo, useState, type MouseEvent } from 'react'
 import { useEditorStore } from '../stores/editorStore'
 import { useFileListStore } from '../stores/fileListStore'
+import { useRecentlyDeletedStore } from '../stores/recentlyDeletedStore'
 import { useRootFolderStore } from '../stores/rootFolderStore'
 import type { EditableFile, SortMode } from '../types/file'
+import { findParentFolderId, getDirectFilesForSelection, getFolderSelection } from '../utils/folderSelection'
 import { flattenFiles } from '../utils/flattenFiles'
 import { ContextMenu } from './ContextMenu'
 import { FileCard } from './FileCard'
+import { RecentlyDeletedPane } from './RecentlyDeletedPane'
 import { showToast } from './Toast'
 
 const sortLabels: Record<SortMode, string> = {
@@ -19,23 +22,30 @@ export function FlatFileListPane() {
   const folders = useRootFolderStore((state) => state.folders)
   const activeFolderId = useRootFolderStore((state) => state.activeFolderId)
   const renameFile = useRootFolderStore((state) => state.renameFile)
+  const removeFile = useRootFolderStore((state) => state.removeFile)
   const selectFolder = useRootFolderStore((state) => state.selectFolder)
   const { query, sortMode, setQuery, setSortMode } = useFileListStore()
   const activeFileId = useEditorStore((state) => state.activeFileId)
   const contents = useEditorStore((state) => state.contents)
   const openFile = useEditorStore((state) => state.openFile)
+  const removeContent = useEditorStore((state) => state.removeContent)
+  const moveToRecentlyDeleted = useRecentlyDeletedStore((state) => state.moveToRecentlyDeleted)
+  const deletedCount = useRecentlyDeletedStore((state) => state.recentlyDeletedFiles.length)
   const [sortOpen, setSortOpen] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; file: EditableFile } | null>(null)
 
-  const activeFolder = folders.find((folder) => folder.id === activeFolderId)
-  const title = activeFolderId === 'all' ? '全部文件' : (activeFolder?.name ?? '未选择资料夹')
+  const selectedFolder = getFolderSelection(folders, activeFolderId)
+  const isAllFiles = activeFolderId === 'all'
+  const isRecentlyDeleted = activeFolderId === 'recently-deleted'
+  const title = isAllFiles ? '全部文件' : isRecentlyDeleted ? '最近删除' : (selectedFolder?.name ?? '未选择资料夹')
+
   const files = useMemo(() => {
-    const sourceFolders = activeFolderId === 'all'
-      ? folders
-      : folders.filter((folder) => folder.id === activeFolderId)
+    if (isRecentlyDeleted) return []
+    const source = isAllFiles
+      ? folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id))
+      : getDirectFilesForSelection(folders, activeFolderId)
     const needle = query.trim().toLocaleLowerCase()
-    const result = sourceFolders.flatMap((folder) =>
-      flattenFiles(folder.tree ?? [], folder.path, folder.id))
+    return source
       .filter((file) => {
         const content = contents[file.id] ?? ''
         return !needle
@@ -43,13 +53,12 @@ export function FlatFileListPane() {
           || file.relativePath.toLocaleLowerCase().includes(needle)
           || content.toLocaleLowerCase().includes(needle)
       })
-
-    return result.sort((a, b) => {
-      if (sortMode === 'updatedAt') return (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')
-      if (sortMode === 'path') return a.path.localeCompare(b.path, 'zh-CN')
-      return a.name.localeCompare(b.name, 'zh-CN')
-    })
-  }, [activeFolderId, contents, folders, query, sortMode])
+      .sort((a, b) => {
+        if (sortMode === 'updatedAt') return (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')
+        if (sortMode === 'path') return a.path.localeCompare(b.path, 'zh-CN')
+        return a.name.localeCompare(b.name, 'zh-CN')
+      })
+  }, [activeFolderId, contents, folders, isAllFiles, isRecentlyDeleted, query, sortMode])
 
   const openMenu = (event: MouseEvent, file: EditableFile) => {
     event.preventDefault()
@@ -60,53 +69,64 @@ export function FlatFileListPane() {
     <div className="file-list-shell">
       <header className="file-list-header">
         <div>
-          <span className="eyebrow">{activeFolderId === 'all' ? '所有资料夹' : '当前资料夹'}</span>
+          <span className="eyebrow">{isAllFiles ? '所有资料夹' : isRecentlyDeleted ? '删除缓冲区' : '当前资料夹'}</span>
           <h2>{title}</h2>
-        </div>
-        <span className="file-count">{files.length}</span>
-      </header>
-
-      <div className="file-list-tools">
-        <label className="search-field">
-          <Search size={14} />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索文件名或内容"
-          />
-        </label>
-        <div className="sort-control">
-          <button onClick={() => setSortOpen((open) => !open)}>
-            {sortLabels[sortMode]}<ChevronDown size={12} />
-          </button>
-          {sortOpen && (
-            <div className="sort-menu">
-              {(Object.keys(sortLabels) as SortMode[]).map((mode) => (
-                <button key={mode} onClick={() => { setSortMode(mode); setSortOpen(false) }}>
-                  <span>{sortLabels[mode]}</span>{sortMode === mode && <Check size={13} />}
-                </button>
-              ))}
-            </div>
+          {!isAllFiles && !isRecentlyDeleted && (
+            <span className="folder-title-chip"><FolderIcon size={10} />{title}</span>
           )}
         </div>
-      </div>
+        <span className="file-count">
+          {isRecentlyDeleted ? deletedCount : files.length}
+        </span>
+      </header>
 
-      <div className="file-list" role="listbox">
-        {files.map((file) => (
-          <FileCard
-            key={file.id}
-            file={file}
-            content={contents[file.id] ?? ''}
-            selected={activeFileId === file.id}
-            onOpen={() => {
-              if (activeFolderId !== 'all' && file.rootFolderId) selectFolder(file.rootFolderId)
-              openFile(file.id)
-            }}
-            onContextMenu={(event) => openMenu(event, file)}
-          />
-        ))}
-        {files.length === 0 && <div className="list-empty">没有匹配的可查看文件</div>}
-      </div>
+      {!isRecentlyDeleted && (
+        <div className="file-list-tools">
+          <label className="search-field">
+            <Search size={14} />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={isAllFiles ? '搜索所有文件名或内容' : `搜索“${title}”`}
+            />
+          </label>
+          <div className="sort-control">
+            <button onClick={() => setSortOpen((open) => !open)}>
+              {sortLabels[sortMode]}<ChevronDown size={12} />
+            </button>
+            {sortOpen && (
+              <div className="sort-menu">
+                {(Object.keys(sortLabels) as SortMode[]).map((mode) => (
+                  <button key={mode} onClick={() => { setSortMode(mode); setSortOpen(false) }}>
+                    <span>{sortLabels[mode]}</span>{sortMode === mode && <Check size={13} />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {isRecentlyDeleted ? (
+        <RecentlyDeletedPane />
+      ) : (
+        <div className="file-list" role="listbox">
+          {files.map((file) => (
+            <FileCard
+              key={file.id}
+              file={file}
+              content={contents[file.id] ?? ''}
+              selected={activeFileId === file.id}
+              onOpen={() => {
+                if (!isAllFiles && file.rootFolderId) selectFolder(activeFolderId ?? file.rootFolderId)
+                openFile(file.id)
+              }}
+              onContextMenu={(event) => openMenu(event, file)}
+            />
+          ))}
+          {files.length === 0 && <div className="list-empty">此资料夹没有直属的可打开文件</div>}
+        </div>
+      )}
 
       {menu && (
         <ContextMenu
@@ -130,6 +150,35 @@ export function FlatFileListPane() {
             }
             setMenu(null)
           }}
+          onDelete={() => {
+            const root = folders.find((folder) => folder.id === menu.file.rootFolderId)
+            if (!root || !menu.file.rootFolderId) return
+            const parentId = findParentFolderId(root.tree ?? [], menu.file.id)
+            moveToRecentlyDeleted({
+              id: menu.file.id,
+              name: menu.file.name,
+              originalPath: menu.file.path,
+              originalRootFolderId: menu.file.rootFolderId,
+              originalParentId: parentId,
+              deletedAt: new Date().toISOString(),
+              extension: menu.file.extension,
+              kind: menu.file.kind,
+              editable: menu.file.editable,
+              content: contents[menu.file.id] ?? '',
+              node: {
+                id: menu.file.id,
+                name: menu.file.name,
+                path: menu.file.path,
+                kind: 'file',
+                extension: menu.file.extension,
+              },
+            })
+            removeFile(menu.file.id)
+            removeContent(menu.file.id)
+            showToast('已移到最近删除（Mock）')
+            setMenu(null)
+          }}
+          deleteLabel="移到最近删除"
         />
       )}
     </div>
