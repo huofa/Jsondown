@@ -1,0 +1,22 @@
+export type EditorCommand =
+  | 'undo'
+  | 'redo'
+  | 'paragraph'
+  | 'bold'
+  | 'italic'
+  | 'strikethrough'
+  | 'inline-code'
+  | 'bullet-list'
+  | 'ordered-list'
+  | 'task-list'
+  | 'link'
+  | 'image'
+  | 'table'
+  | 'code-block'
+  | 'blockquote'
+  | 'hr'
+
+export type EditorCommandApi = {
+  run: (command: EditorCommand, payload?: string) => boolean
+  heading: (level: number) => boolean
+}

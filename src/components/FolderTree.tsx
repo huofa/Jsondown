@@ -2,11 +2,13 @@ import { ChevronDown, ChevronRight, File, FileCode2, FileImage, Folder, FolderOp
 import type { FileTreeNode } from '../types/fileTree'
 import { useFileTreeStore } from '../stores/fileTreeStore'
 import { useEditorStore } from '../stores/editorStore'
+import { useRootFolderStore } from '../stores/rootFolderStore'
 import { isViewableFile } from '../utils/fileFilters'
 
 type FolderTreeProps = {
   nodes: FileTreeNode[]
   depth?: number
+  rootFolderId?: string
 }
 
 function TreeFileIcon({ extension }: { extension?: string }) {
@@ -15,7 +17,7 @@ function TreeFileIcon({ extension }: { extension?: string }) {
   return <File size={14} />
 }
 
-export function FolderTree({ nodes, depth = 0 }: FolderTreeProps) {
+export function FolderTree({ nodes, depth = 0, rootFolderId }: FolderTreeProps) {
   const expandedIds = useFileTreeStore((state) => state.expandedIds)
   const toggleExpanded = useFileTreeStore((state) => state.toggleExpanded)
   const activeFileId = useEditorStore((state) => state.activeFileId)
@@ -38,7 +40,7 @@ export function FolderTree({ nodes, depth = 0 }: FolderTreeProps) {
                 {expanded ? <FolderOpen size={15} /> : <Folder size={15} />}
                 <span>{node.name}</span>
               </button>
-              {expanded && <FolderTree nodes={node.children ?? []} depth={depth + 1} />}
+              {expanded && <FolderTree nodes={node.children ?? []} depth={depth + 1} rootFolderId={rootFolderId} />}
             </div>
           )
         }
@@ -49,7 +51,10 @@ export function FolderTree({ nodes, depth = 0 }: FolderTreeProps) {
             key={node.id}
             className={`tree-row tree-file ${activeFileId === node.id ? 'is-active' : ''}`}
             style={{ paddingLeft: 27 + depth * 14 }}
-            onClick={() => openFile(node.id)}
+            onClick={() => {
+              if (rootFolderId) useRootFolderStore.getState().selectFolder(rootFolderId)
+              openFile(node.id)
+            }}
             title={node.path}
           >
             <TreeFileIcon extension={node.extension} />

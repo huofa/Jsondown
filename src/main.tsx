@@ -5,6 +5,7 @@ import '@milkdown/crepe/theme/common/style.css'
 import '@milkdown/crepe/theme/frame.css'
 import './styles/app.css'
 import './styles/layout.css'
+import './styles/top-toolbar.css'
 import './styles/milkdown-overrides.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

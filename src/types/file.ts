@@ -8,12 +8,14 @@ export type EditableFileKind =
 
 export type EditableFile = {
   id: string
+  rootFolderId?: string
   name: string
   path: string
   relativePath: string
   extension: string
   kind: EditableFileKind
   editable: boolean
+  createdAt?: string
   updatedAt?: string
   size?: number
 }

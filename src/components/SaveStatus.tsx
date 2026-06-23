@@ -2,10 +2,10 @@ import { AlertCircle, Check, Cloud, LoaderCircle, PencilLine, RefreshCw } from '
 import type { SaveStatus as SaveStatusType } from '../types/editor'
 
 const labels: Record<SaveStatusType, string> = {
-  idle: '已打开',
-  dirty: '有未保存更改',
-  saving: '正在保存…',
-  saved: '已自动保存',
+  idle: '自动保存',
+  dirty: '自动保存',
+  saving: '正在保存',
+  saved: '已保存',
   error: '保存失败',
   'external-changed': '文件已在外部更改',
 }

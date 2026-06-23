@@ -3,7 +3,7 @@ import type { FileTreeNode } from '../types/fileTree'
 import { getFileKind, isEditableFile, isViewableFile, normalizeExtension } from './fileFilters'
 import { mockFileMeta } from './mockFileSystem'
 
-export function flattenFiles(nodes: FileTreeNode[], rootPath: string): EditableFile[] {
+export function flattenFiles(nodes: FileTreeNode[], rootPath: string, rootFolderId?: string): EditableFile[] {
   const files: EditableFile[] = []
 
   const walk = (items: FileTreeNode[]) => {
@@ -18,12 +18,14 @@ export function flattenFiles(nodes: FileTreeNode[], rootPath: string): EditableF
       const meta = mockFileMeta[node.path]
       files.push({
         id: node.id,
+        rootFolderId,
         name: node.name,
         path: node.path,
         relativePath: node.path.replace(`${rootPath}/`, ''),
         extension,
         kind: getFileKind(extension),
         editable: isEditableFile(node.name),
+        createdAt: meta?.createdAt,
         updatedAt: meta?.updatedAt,
         size: meta?.size,
       })

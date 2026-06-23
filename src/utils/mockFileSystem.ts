@@ -87,19 +87,19 @@ export const mockRootFolders: RootFolder[] = [
   },
 ]
 
-export const mockFileMeta: Record<string, { updatedAt: string; size: number }> = {
-  '/Users/demo/Documents/Jsondown Notes/Inbox/欢迎使用 Jsondown.md': { updatedAt: '2026-06-23T08:36:00.000Z', size: 2470 },
-  '/Users/demo/Documents/Jsondown Notes/Inbox/灵感清单.markdown': { updatedAt: '2026-06-22T12:05:00.000Z', size: 918 },
-  '/Users/demo/Documents/Jsondown Notes/Projects/Jsondown/V0.1 路线图.md': { updatedAt: '2026-06-23T07:10:00.000Z', size: 3360 },
-  '/Users/demo/Documents/Jsondown Notes/Projects/Jsondown/settings.json': { updatedAt: '2026-06-21T09:24:00.000Z', size: 426 },
-  '/Users/demo/Documents/Jsondown Notes/Projects/Jsondown/EditorPane.tsx': { updatedAt: '2026-06-20T15:30:00.000Z', size: 1803 },
-  '/Users/demo/Documents/Jsondown Notes/Projects/产品简报.txt': { updatedAt: '2026-06-18T04:42:00.000Z', size: 774 },
-  '/Users/demo/Documents/Jsondown Notes/Assets/cover.svg': { updatedAt: '2026-06-17T06:15:00.000Z', size: 4032 },
-  '/Users/demo/Documents/Jsondown Notes/README.md': { updatedAt: '2026-06-16T11:02:00.000Z', size: 1460 },
-  '/Users/demo/Work/工作手记/周报/2026-W25.md': { updatedAt: '2026-06-22T10:20:00.000Z', size: 2050 },
-  '/Users/demo/Work/工作手记/周报/2026-W24.md': { updatedAt: '2026-06-15T10:20:00.000Z', size: 1912 },
-  '/Users/demo/Work/工作手记/api-example.html': { updatedAt: '2026-06-12T08:10:00.000Z', size: 840 },
-  '/Users/demo/Work/工作手记/cleanup.py': { updatedAt: '2026-06-11T13:55:00.000Z', size: 605 },
+export const mockFileMeta: Record<string, { createdAt?: string; updatedAt: string; size: number }> = {
+  '/Users/demo/Documents/Jsondown Notes/Inbox/欢迎使用 Jsondown.md': { createdAt: '2026-06-19T04:21:00.000Z', updatedAt: '2026-06-23T08:36:00.000Z', size: 2470 },
+  '/Users/demo/Documents/Jsondown Notes/Inbox/灵感清单.markdown': { createdAt: '2026-06-20T02:18:00.000Z', updatedAt: '2026-06-22T12:05:00.000Z', size: 918 },
+  '/Users/demo/Documents/Jsondown Notes/Projects/Jsondown/V0.1 路线图.md': { createdAt: '2026-06-18T07:10:00.000Z', updatedAt: '2026-06-23T07:10:00.000Z', size: 3360 },
+  '/Users/demo/Documents/Jsondown Notes/Projects/Jsondown/settings.json': { createdAt: '2026-06-17T09:24:00.000Z', updatedAt: '2026-06-21T09:24:00.000Z', size: 426 },
+  '/Users/demo/Documents/Jsondown Notes/Projects/Jsondown/EditorPane.tsx': { createdAt: '2026-06-16T15:30:00.000Z', updatedAt: '2026-06-20T15:30:00.000Z', size: 1803 },
+  '/Users/demo/Documents/Jsondown Notes/Projects/产品简报.txt': { createdAt: '2026-06-15T04:42:00.000Z', updatedAt: '2026-06-18T04:42:00.000Z', size: 774 },
+  '/Users/demo/Documents/Jsondown Notes/Assets/cover.svg': { createdAt: '2026-06-17T06:15:00.000Z', updatedAt: '2026-06-17T06:15:00.000Z', size: 4032 },
+  '/Users/demo/Documents/Jsondown Notes/README.md': { createdAt: '2026-06-12T11:02:00.000Z', updatedAt: '2026-06-16T11:02:00.000Z', size: 1460 },
+  '/Users/demo/Work/工作手记/周报/2026-W25.md': { createdAt: '2026-06-22T10:20:00.000Z', updatedAt: '2026-06-22T10:20:00.000Z', size: 2050 },
+  '/Users/demo/Work/工作手记/周报/2026-W24.md': { createdAt: '2026-06-15T10:20:00.000Z', updatedAt: '2026-06-15T10:20:00.000Z', size: 1912 },
+  '/Users/demo/Work/工作手记/api-example.html': { createdAt: '2026-06-10T08:10:00.000Z', updatedAt: '2026-06-12T08:10:00.000Z', size: 840 },
+  '/Users/demo/Work/工作手记/cleanup.py': { createdAt: '2026-06-11T13:55:00.000Z', updatedAt: '2026-06-11T13:55:00.000Z', size: 605 },
 }
 
 export const mockFileContents: Record<string, string> = {
@@ -206,12 +206,12 @@ def markdown_files(root: Path):
 print(markdown_files(Path.home() / "Documents"))`,
 }
 
-export function createMockFolder(index: number): RootFolder {
+export function createMockFolder(index: number, name = `新建资料夹 ${index}`): RootFolder {
   const id = `root-mock-${Date.now()}`
-  const path = `/Users/demo/Documents/新建资料夹 ${index}`
+  const path = `/Users/demo/Desktop/${name}`
   return {
     id,
-    name: `新建资料夹 ${index}`,
+    name,
     path,
     order: index + 10,
     tree: [

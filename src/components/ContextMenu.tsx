@@ -1,4 +1,4 @@
-import { Clipboard, ExternalLink } from 'lucide-react'
+import { Clipboard, ExternalLink, Pencil, Trash2 } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -7,10 +7,20 @@ type ContextMenuProps = {
   y: number
   onClose: () => void
   onOpenInFinder: () => void
-  onCopyPath: () => void
+  onCopyPath?: () => void
+  onRename?: () => void
+  onDelete?: () => void
 }
 
-export function ContextMenu({ x, y, onClose, onOpenInFinder, onCopyPath }: ContextMenuProps) {
+export function ContextMenu({
+  x,
+  y,
+  onClose,
+  onOpenInFinder,
+  onCopyPath,
+  onRename,
+  onDelete,
+}: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -28,7 +38,9 @@ export function ContextMenu({ x, y, onClose, onOpenInFinder, onCopyPath }: Conte
   return createPortal(
     <div ref={ref} className="context-menu" style={{ left: x, top: y }}>
       <button onClick={onOpenInFinder}><ExternalLink size={14} />在访达中打开</button>
-      <button onClick={onCopyPath}><Clipboard size={14} />复制路径</button>
+      {onCopyPath && <button onClick={onCopyPath}><Clipboard size={14} />复制路径</button>}
+      {onRename && <button onClick={onRename}><Pencil size={14} />重命名</button>}
+      {onDelete && <button className="danger" onClick={onDelete}><Trash2 size={14} />删除入口</button>}
     </div>,
     document.body,
   )

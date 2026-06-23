@@ -1,31 +1,34 @@
-import { FileQuestion, FolderOpen, MoreHorizontal } from 'lucide-react'
-import { useEffect, useMemo, useRef } from 'react'
+import { FileQuestion, FolderOpen, MoreHorizontal, SquarePen } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useEditorStore } from '../stores/editorStore'
 import { useRootFolderStore } from '../stores/rootFolderStore'
 import { useThemeStore } from '../stores/themeStore'
+import type { EditorCommandApi } from '../types/editorCommand'
 import { flattenFiles } from '../utils/flattenFiles'
+import { formatDisplayTime } from '../utils/formatDisplayTime'
+import { ImagePreview } from './ImagePreview'
 import { MilkdownEditor } from './MilkdownEditor'
 import { ReadonlyCodeViewer } from './ReadonlyCodeViewer'
-import { ImagePreview } from './ImagePreview'
 import { SaveStatus } from './SaveStatus'
 import { ThemeSwitcher } from './ThemeSwitcher'
-import { showToast } from './Toast'
+import { ToastHost, showToast } from './Toast'
+import { TopEditorToolbar } from './TopEditorToolbar'
 
 export function EditorPane() {
   const folders = useRootFolderStore((state) => state.folders)
   const activeFolderId = useRootFolderStore((state) => state.activeFolderId)
-  const { activeFileId, contents, saveStatus, updateContent, setSaveStatus, markSaved } = useEditorStore()
+  const createMockDocument = useRootFolderStore((state) => state.createMockDocument)
+  const { activeFileId, contents, saveStatus, openFile, updateContent, setSaveStatus, markSaved } = useEditorStore()
   const theme = useThemeStore((state) => state.theme)
+  const [editorApi, setEditorApi] = useState<EditorCommandApi | null>(null)
   const saveTimer = useRef<number | undefined>(undefined)
   const savingTimer = useRef<number | undefined>(undefined)
 
-  const activeFolder = folders.find((folder) => folder.id === activeFolderId)
-  const file = useMemo(
-    () => activeFolder
-      ? flattenFiles(activeFolder.tree ?? [], activeFolder.path).find((item) => item.id === activeFileId)
-      : undefined,
-    [activeFolder, activeFileId],
+  const allFiles = useMemo(
+    () => folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id)),
+    [folders],
   )
+  const file = allFiles.find((item) => item.id === activeFileId)
   const content = activeFileId ? (contents[activeFileId] ?? '') : ''
 
   useEffect(() => {
@@ -43,54 +46,63 @@ export function EditorPane() {
     window.clearTimeout(savingTimer.current)
   }, [])
 
-  if (!file) {
-    return (
-      <div className={`editor-shell ${theme}`}>
-        <div className="editor-empty">
-          <div className="empty-mark"><FileQuestion size={27} /></div>
-          <h2>选一篇笔记，开始写作</h2>
-          <p>Markdown 文件可以直接编辑，代码、文本与图片会以只读方式打开。</p>
-        </div>
-      </div>
-    )
+  const createDocument = () => {
+    const id = createMockDocument(activeFolderId)
+    if (id) {
+      openFile(id)
+      showToast('已新建 Markdown 笔记')
+    }
   }
 
   return (
     <div className={`editor-shell ${theme}`}>
       <header className="editor-header">
-        <div className="editor-title">
-          <span className="eyebrow">{file.editable ? 'MARKDOWN NOTE' : 'READ ONLY'}</span>
-          <h2>{file.name}</h2>
-        </div>
+        <button className="new-document-button" onClick={createDocument} title="新建文档" aria-label="新建文档">
+          <SquarePen size={15} />
+        </button>
+        <TopEditorToolbar api={editorApi} disabled={!file?.editable} />
         <div className="editor-actions">
-          {file.editable && <SaveStatus status={saveStatus} />}
+          {file?.editable && <SaveStatus status={saveStatus} />}
           <ThemeSwitcher />
           <button
             className="icon-button"
             title="在访达中打开（Mock）"
-            onClick={() => showToast(`阶段 A Mock：在访达中显示 ${file.name}`)}
+            aria-label="在访达中打开"
+            disabled={!file}
+            onClick={() => file && showToast(`阶段 A Mock：在访达中显示 ${file.name}`)}
           >
-            <FolderOpen size={16} />
+            <FolderOpen size={15} />
           </button>
-          <button className="icon-button" title="更多"><MoreHorizontal size={17} /></button>
+          <button className="icon-button" title="更多" aria-label="更多"><MoreHorizontal size={16} /></button>
         </div>
       </header>
 
-      <div className="editor-scroll">
-        {file.editable ? (
-          <article className="paper">
-            <MilkdownEditor
-              key={file.id}
-              value={content}
-              onChange={(markdown) => updateContent(file.id, markdown)}
-            />
-          </article>
-        ) : file.kind === 'image' ? (
-          <ImagePreview src={content} name={file.name} />
-        ) : (
-          <ReadonlyCodeViewer content={content} language={file.extension} />
-        )}
-      </div>
+      {!file ? (
+        <div className="editor-empty">
+          <div className="empty-mark"><FileQuestion size={27} /></div>
+          <h2>选一篇笔记，开始写作</h2>
+          <p>Markdown 文件可以直接编辑，代码、文本与图片会以只读方式打开。</p>
+        </div>
+      ) : (
+        <div className="editor-scroll">
+          <div className="note-created-time">{formatDisplayTime(file.createdAt ?? file.updatedAt ?? new Date().toISOString())}</div>
+          {file.editable ? (
+            <article className="paper">
+              <MilkdownEditor
+                key={file.id}
+                value={content}
+                onReady={setEditorApi}
+                onChange={(markdown) => updateContent(file.id, markdown)}
+              />
+            </article>
+          ) : file.kind === 'image' ? (
+            <ImagePreview src={content} name={file.name} />
+          ) : (
+            <ReadonlyCodeViewer content={content} language={file.extension} />
+          )}
+        </div>
+      )}
+      <ToastHost />
     </div>
   )
 }
