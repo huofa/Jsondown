@@ -1,0 +1,42 @@
+.milkdown-host, .milkdown-host .milkdown { min-height: 100%; color: inherit; background: transparent !important; }
+.milkdown-host .milkdown { border: 0 !important; box-shadow: none !important; }
+
+.milkdown-host .ProseMirror {
+  min-height: 580px;
+  padding: 0 !important;
+  outline: none;
+  color: inherit;
+  caret-color: #9e6f2e;
+  font-family: ui-serif, "New York", "Iowan Old Style", "Songti SC", Georgia, serif;
+  font-size: 16px;
+  line-height: 1.82;
+  letter-spacing: .006em;
+}
+
+.milkdown-host .ProseMirror > *:first-child { margin-top: 0; }
+.milkdown-host .ProseMirror p { margin: .76em 0; }
+.milkdown-host .ProseMirror h1, .milkdown-host .ProseMirror h2, .milkdown-host .ProseMirror h3 {
+  color: inherit;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
+  line-height: 1.3;
+  letter-spacing: -.025em;
+}
+.milkdown-host .ProseMirror h1 { margin: 0 0 1.1em; font-size: 31px; font-weight: 720; }
+.milkdown-host .ProseMirror h2 { margin: 1.9em 0 .65em; font-size: 21px; font-weight: 680; }
+.milkdown-host .ProseMirror h3 { margin: 1.5em 0 .5em; font-size: 17px; font-weight: 670; }
+.milkdown-host .ProseMirror ul, .milkdown-host .ProseMirror ol { padding-left: 1.5em; }
+.milkdown-host .ProseMirror li { margin: .28em 0; }
+.milkdown-host .ProseMirror blockquote { margin: 1.4em 0; padding: .15em 0 .15em 1.15em; border-left: 3px solid #ccb78f; color: #766d62; }
+.milkdown-host .ProseMirror a { color: #9c6724; text-decoration-color: rgba(156,103,36,.35); text-underline-offset: 3px; }
+.milkdown-host .ProseMirror code { padding: .14em .34em; border-radius: 4px; background: rgba(100,87,68,.08); font: .87em ui-monospace, SFMono-Regular, Menlo, monospace; }
+.milkdown-host .ProseMirror pre { border: 1px solid rgba(70,64,56,.12) !important; border-radius: 8px !important; background: #242527 !important; box-shadow: none !important; }
+.milkdown-host .ProseMirror hr { margin: 2em 0; border: 0; border-top: 1px solid rgba(70,62,52,.13); }
+.milkdown-host .ProseMirror table { font-family: ui-sans-serif, -apple-system, sans-serif; font-size: 13px; }
+
+.milkdown-host [data-milkdown-root] { background: transparent !important; }
+.milkdown-host .milkdown-toolbar, .milkdown-host [data-milkdown-component="toolbar"] {
+  border-color: rgba(70,62,52,.12) !important;
+  border-radius: 9px !important;
+  background: rgba(255,255,255,.96) !important;
+  box-shadow: 0 10px 30px rgba(55,46,37,.13) !important;
+}

@@ -1,0 +1,95 @@
+:root {
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: #2c2925;
+  background: #e8e5df;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+
+button, input, select { font: inherit; }
+button { color: inherit; }
+
+button:focus-visible, input:focus-visible {
+  outline: 2px solid rgba(180, 126, 45, .48);
+  outline-offset: 1px;
+}
+
+.app-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 900px;
+  background: #f5f3ee;
+}
+
+.window-drag-strip {
+  position: absolute;
+  z-index: 20;
+  top: 13px;
+  left: 14px;
+  display: flex;
+  gap: 7px;
+  pointer-events: none;
+}
+
+.window-drag-strip span {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #d2cec5;
+}
+
+.window-drag-strip span:first-child { background: #e3a89e; }
+.window-drag-strip span:nth-child(2) { background: #e8cf8d; }
+.window-drag-strip span:last-child { background: #9fc9a2; }
+
+.eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  color: #a19a90;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .12em;
+}
+
+.icon-button, .tiny-icon-button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.icon-button { width: 30px; height: 30px; }
+.tiny-icon-button { width: 22px; height: 22px; }
+.icon-button:hover, .tiny-icon-button:hover { background: rgba(79, 70, 59, .08); }
+
+.toast {
+  position: fixed;
+  z-index: 1000;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  padding: 10px 15px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 10px;
+  color: white;
+  background: rgba(42, 39, 35, .9);
+  box-shadow: 0 10px 30px rgba(0,0,0,.16);
+  font-size: 13px;
+  backdrop-filter: blur(14px);
+  animation: toast-in .18s ease-out;
+}
+
+@keyframes toast-in {
+  from { transform: translate(-50%, 8px); opacity: 0; }
+}
+
+.spin { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
