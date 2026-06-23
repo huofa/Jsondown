@@ -1,7 +1,6 @@
 import {
   ChevronDown,
   ChevronRight,
-  Files,
   Folder,
   FolderPlus,
   GripVertical,
@@ -77,9 +76,10 @@ export function RootFolderSidebar() {
           className={`system-folder-row all-files-row ${activeFolderId === 'all' ? 'is-active' : ''}`}
           onClick={() => selectFolder('all')}
         >
-          <Files size={16} />
-          <span>全部文件</span>
-          <small>{ordered.reduce((sum, folder) => sum + flattenFiles(folder.tree ?? [], folder.path).length, 0)}</small>
+          <span className="system-folder-chevron" />
+          <Folder size={15} fill="currentColor" />
+          <span className="system-folder-copy"><strong>全部文件</strong></span>
+          <em>{ordered.reduce((sum, folder) => sum + flattenFiles(folder.tree ?? [], folder.path).length, 0)}</em>
         </button>
 
         <div className="root-folder-list">

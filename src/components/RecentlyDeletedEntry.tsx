@@ -11,9 +11,10 @@ export function RecentlyDeletedEntry() {
       className={`system-folder-row recently-deleted-entry ${selected ? 'is-active' : ''}`}
       onClick={() => selectFolder('recently-deleted')}
     >
+      <span className="system-folder-chevron" />
       <Trash2 size={15} />
-      <span>最近删除</span>
-      <small>{count}</small>
+      <span className="system-folder-copy"><strong>最近删除</strong></span>
+      <em>{count}</em>
     </button>
   )
 }

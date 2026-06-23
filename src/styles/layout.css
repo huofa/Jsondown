@@ -45,9 +45,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 36px;
-  margin: 1px 0 8px;
-  padding: 0 10px;
+  min-height: 42px;
+  margin: 2px 0 7px;
+  padding: 3px 6px 3px 4px;
   border: 0;
   border-radius: 8px;
   color: #5e5952;
@@ -55,7 +55,10 @@
   font-size: 12.5px;
   cursor: pointer;
 }
-.system-folder-row small { margin-left: auto; color: #9a948b; font-size: 10px; }
+.system-folder-row .system-folder-chevron { width: 20px; flex: 0 0 20px; }
+.system-folder-copy { min-width: 0; flex: 1; text-align: left; }
+.system-folder-copy strong { color: #4b4640; font-size: 12.5px; font-weight: 620; }
+.system-folder-row em { color: #a59f96; font-size: 9px; font-style: normal; }
 .system-folder-row:hover { background: rgba(255,255,255,.45); }
 .system-folder-row.is-active { color: #392f23; background: rgba(255,255,255,.86); box-shadow: 0 1px 2px rgba(48,42,34,.04); }
 .recently-deleted-entry { margin-top: 8px; color: #777068; }
@@ -192,6 +195,19 @@
 .file-card-footer time { margin-right: auto; }
 .file-card-footer .file-type { padding: 1px 4px; border-radius: 3px; background: rgba(255,255,255,.5); font-size: 7.5px; font-weight: 750; letter-spacing: .04em; }
 .file-card-footer .editable { color: #88704d; }
+.file-parent-folder {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  margin-top: 5px;
+  overflow: hidden;
+  color: #9b948b;
+  font-size: 8.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-parent-folder svg { flex: 0 0 auto; opacity: .78; }
 .list-empty { padding: 45px 15px; color: #aaa39b; font-size: 12px; text-align: center; }
 
 /* Editor */
@@ -296,7 +312,8 @@
 
 /* Layout density presets — custom currently inherits comfortable values. */
 .density-compact .root-folder-row,
-.density-compact .root-folder-select { min-height: 35px; }
+.density-compact .root-folder-select,
+.density-compact .system-folder-row { min-height: 35px; }
 .density-compact .tree-row { height: 20px; }
 .density-compact .file-card { min-height: 68px; padding-block: 8px; }
 .density-compact .file-card-summary { min-height: 14px; -webkit-line-clamp: 1; }
@@ -308,7 +325,8 @@
 .density-custom .paper { max-width: 1080px; }
 
 .density-loose .root-folder-row,
-.density-loose .root-folder-select { min-height: 49px; }
+.density-loose .root-folder-select,
+.density-loose .system-folder-row { min-height: 49px; }
 .density-loose .tree-row { height: 29px; }
 .density-loose .file-card { min-height: 98px; padding-block: 14px; }
 .density-loose .file-card-summary { line-height: 1.55; }

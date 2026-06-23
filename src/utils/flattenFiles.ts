@@ -6,10 +6,11 @@ import { mockFileMeta } from './mockFileSystem'
 export function flattenFiles(nodes: FileTreeNode[], rootPath: string, rootFolderId?: string): EditableFile[] {
   const files: EditableFile[] = []
 
-  const walk = (items: FileTreeNode[]) => {
+  const rootFolderName = rootPath.split('/').filter(Boolean).pop() ?? rootPath
+  const walk = (items: FileTreeNode[], parentFolderName: string, parentFolderPath: string) => {
     items.forEach((node) => {
       if (node.kind === 'directory') {
-        walk(node.children ?? [])
+        walk(node.children ?? [], node.name, node.path)
         return
       }
       if (!isViewableFile(node.name)) return
@@ -25,6 +26,8 @@ export function flattenFiles(nodes: FileTreeNode[], rootPath: string, rootFolder
         extension,
         kind: getFileKind(extension),
         editable: isEditableFile(node.name),
+        parentFolderName,
+        parentFolderPath,
         createdAt: meta?.createdAt,
         updatedAt: meta?.updatedAt,
         size: meta?.size,
@@ -32,6 +35,6 @@ export function flattenFiles(nodes: FileTreeNode[], rootPath: string, rootFolder
     })
   }
 
-  walk(nodes)
+  walk(nodes, rootFolderName, rootPath)
   return files
 }

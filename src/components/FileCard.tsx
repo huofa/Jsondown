@@ -1,3 +1,4 @@
+import { Folder } from 'lucide-react'
 import type { MouseEvent } from 'react'
 import type { EditableFile } from '../types/file'
 import { extractMarkdownSummary } from '../utils/extractMarkdownSummary'
@@ -18,11 +19,19 @@ type FileCardProps = {
   file: EditableFile
   content: string
   selected: boolean
+  showParentFolder?: boolean
   onOpen: () => void
   onContextMenu: (event: MouseEvent) => void
 }
 
-export function FileCard({ file, content, selected, onOpen, onContextMenu }: FileCardProps) {
+export function FileCard({
+  file,
+  content,
+  selected,
+  showParentFolder,
+  onOpen,
+  onContextMenu,
+}: FileCardProps) {
   const title = file.name.replace(/\.(md|markdown)$/i, '')
   const summary = file.kind === 'image'
     ? '图片文件'
@@ -42,6 +51,12 @@ export function FileCard({ file, content, selected, onOpen, onContextMenu }: Fil
         <span className="file-type">{file.extension.toUpperCase()}</span>
         <span className={file.editable ? 'editable' : ''}>{file.editable ? '可编辑' : '只读'}</span>
       </span>
+      {showParentFolder && file.parentFolderName && (
+        <span className="file-parent-folder" title={file.parentFolderPath}>
+          <Folder size={10} />
+          {file.parentFolderName}
+        </span>
+      )}
     </button>
   )
 }

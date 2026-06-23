@@ -11,7 +11,13 @@ export type FolderSelection = {
   nodes: FileTreeNode[]
 }
 
-function directFiles(nodes: FileTreeNode[], rootPath: string, rootFolderId: string): EditableFile[] {
+function directFiles(
+  nodes: FileTreeNode[],
+  rootPath: string,
+  rootFolderId: string,
+  parentFolderName: string,
+  parentFolderPath: string,
+): EditableFile[] {
   return nodes.flatMap((node) => {
     if (node.kind !== 'file' || !isViewableFile(node.name)) return []
     const extension = normalizeExtension(node.name)
@@ -25,6 +31,8 @@ function directFiles(nodes: FileTreeNode[], rootPath: string, rootFolderId: stri
       extension,
       kind: getFileKind(extension),
       editable: isEditableFile(node.name),
+      parentFolderName,
+      parentFolderPath,
       createdAt: meta?.createdAt,
       updatedAt: meta?.updatedAt,
       size: meta?.size,
@@ -37,7 +45,7 @@ export function getDirectFilesForSelection(
   selectedFolderId: string | null,
 ): EditableFile[] {
   const root = folders.find((folder) => folder.id === selectedFolderId)
-  if (root) return directFiles(root.tree ?? [], root.path, root.id)
+  if (root) return directFiles(root.tree ?? [], root.path, root.id, root.name, root.path)
 
   for (const folder of folders) {
     const queue = [...(folder.tree ?? [])]
@@ -45,7 +53,7 @@ export function getDirectFilesForSelection(
       const node = queue.shift()!
       if (node.kind === 'directory') {
         if (node.id === selectedFolderId) {
-          return directFiles(node.children ?? [], folder.path, folder.id)
+          return directFiles(node.children ?? [], folder.path, folder.id, node.name, node.path)
         }
         queue.push(...(node.children ?? []))
       }

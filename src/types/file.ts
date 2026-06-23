@@ -15,6 +15,8 @@ export type EditableFile = {
   extension: string
   kind: EditableFileKind
   editable: boolean
+  parentFolderName?: string
+  parentFolderPath?: string
   createdAt?: string
   updatedAt?: string
   size?: number

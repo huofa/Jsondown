@@ -117,6 +117,7 @@ export function FlatFileListPane() {
               file={file}
               content={contents[file.id] ?? ''}
               selected={activeFileId === file.id}
+              showParentFolder={isAllFiles}
               onOpen={() => {
                 if (!isAllFiles && file.rootFolderId) selectFolder(activeFolderId ?? file.rootFolderId)
                 openFile(file.id)
