@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Folder as FolderIcon, Search } from 'lucide-react'
+import { Check, ChevronDown, Search } from 'lucide-react'
 import { useMemo, useState, type MouseEvent } from 'react'
 import { useEditorStore } from '../stores/editorStore'
 import { useFileListStore } from '../stores/fileListStore'
@@ -71,9 +71,6 @@ export function FlatFileListPane() {
         <div>
           <span className="eyebrow">{isAllFiles ? '所有资料夹' : isRecentlyDeleted ? '删除缓冲区' : '当前资料夹'}</span>
           <h2>{title}</h2>
-          {!isAllFiles && !isRecentlyDeleted && (
-            <span className="folder-title-chip"><FolderIcon size={10} />{title}</span>
-          )}
         </div>
         <span className="file-count">
           {isRecentlyDeleted ? deletedCount : files.length}

@@ -14,7 +14,8 @@ export function RecentlyDeletedEntry() {
       <span className="system-folder-chevron" />
       <Trash2 size={15} />
       <span className="system-folder-copy"><strong>最近删除</strong></span>
-      <em>{count}</em>
+      <span className="row-action-spacer" />
+      <em className="sidebar-count">{count}</em>
     </button>
   )
 }

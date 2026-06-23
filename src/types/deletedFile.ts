@@ -9,7 +9,7 @@ export type DeletedFile = {
   originalParentId?: string
   deletedAt: string
   extension: string
-  kind: EditableFile['kind']
+  kind: EditableFile['kind'] | 'directory'
   editable: boolean
   content: string
   node: FileTreeNode

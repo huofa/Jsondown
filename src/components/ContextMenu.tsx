@@ -1,4 +1,13 @@
-import { Clipboard, ExternalLink, Pencil, Trash2 } from 'lucide-react'
+import {
+  Clipboard,
+  ExternalLink,
+  FilePlus2,
+  FolderInput,
+  FolderPlus,
+  Pencil,
+  RefreshCw,
+  Trash2,
+} from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -6,10 +15,15 @@ type ContextMenuProps = {
   x: number
   y: number
   onClose: () => void
-  onOpenInFinder: () => void
+  onOpenInFinder?: () => void
   onCopyPath?: () => void
   onRename?: () => void
+  onNewFolder?: () => void
+  onNewFile?: () => void
+  onImportFolder?: () => void
+  onRefresh?: () => void
   onDelete?: () => void
+  renameLabel?: string
   deleteLabel?: string
 }
 
@@ -20,7 +34,12 @@ export function ContextMenu({
   onOpenInFinder,
   onCopyPath,
   onRename,
+  onNewFolder,
+  onNewFile,
+  onImportFolder,
+  onRefresh,
   onDelete,
+  renameLabel = '重命名',
   deleteLabel = '删除入口',
 }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null)
@@ -39,9 +58,13 @@ export function ContextMenu({
 
   return createPortal(
     <div ref={ref} className="context-menu" style={{ left: x, top: y }}>
-      <button onClick={onOpenInFinder}><ExternalLink size={14} />在访达中打开</button>
+      {onOpenInFinder && <button onClick={onOpenInFinder}><ExternalLink size={14} />在访达中打开</button>}
       {onCopyPath && <button onClick={onCopyPath}><Clipboard size={14} />复制路径</button>}
-      {onRename && <button onClick={onRename}><Pencil size={14} />重命名</button>}
+      {onRename && <button onClick={onRename}><Pencil size={14} />{renameLabel}</button>}
+      {onNewFolder && <button onClick={onNewFolder}><FolderPlus size={14} />新建文件夹</button>}
+      {onNewFile && <button onClick={onNewFile}><FilePlus2 size={14} />新建文件</button>}
+      {onImportFolder && <button onClick={onImportFolder}><FolderInput size={14} />导入文件夹</button>}
+      {onRefresh && <button onClick={onRefresh}><RefreshCw size={14} />刷新全部文件</button>}
       {onDelete && <button className="danger" onClick={onDelete}><Trash2 size={14} />{deleteLabel}</button>}
     </div>,
     document.body,

@@ -14,6 +14,7 @@ import { useRootFolderStore } from '../stores/rootFolderStore'
 import type { RootFolder } from '../types/rootFolder'
 import { flattenFiles } from '../utils/flattenFiles'
 import { compactPath } from '../utils/formatDisplayTime'
+import { countViewableFiles } from '../utils/folderSelection'
 import { ContextMenu } from './ContextMenu'
 import { FolderTree } from './FolderTree'
 import { ImportFileDialog } from './ImportFileDialog'
@@ -26,6 +27,8 @@ export function RootFolderSidebar() {
     folders,
     activeFolderId,
     addMockFolder,
+    createMockFile,
+    createMockSubfolder,
     importMockFile,
     removeFolder,
     renameFolder,
@@ -39,8 +42,10 @@ export function RootFolderSidebar() {
   const [newFolderOpen, setNewFolderOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; folder: RootFolder } | null>(null)
+  const [allMenu, setAllMenu] = useState<{ x: number; y: number } | null>(null)
   const ordered = useMemo(() => [...folders].sort((a, b) => a.order - b.order), [folders])
   const importTarget = ordered.find((folder) => folder.id === activeFolderId) ?? ordered[0]
+  const allFilesCount = ordered.reduce((sum, folder) => sum + flattenFiles(folder.tree ?? [], folder.path).length, 0)
 
   const dropOn = (event: DragEvent, targetId: string) => {
     event.preventDefault()
@@ -72,15 +77,27 @@ export function RootFolderSidebar() {
       </header>
 
       <div className="sidebar-scroll">
-        <button
+        <div
           className={`system-folder-row all-files-row ${activeFolderId === 'all' ? 'is-active' : ''}`}
-          onClick={() => selectFolder('all')}
         >
-          <span className="system-folder-chevron" />
-          <Folder size={15} fill="currentColor" />
-          <span className="system-folder-copy"><strong>全部文件</strong></span>
-          <em>{ordered.reduce((sum, folder) => sum + flattenFiles(folder.tree ?? [], folder.path).length, 0)}</em>
-        </button>
+          <button className="system-folder-main" onClick={() => selectFolder('all')}>
+            <span className="system-folder-chevron" />
+            <Folder size={15} fill="currentColor" />
+            <span className="system-folder-copy"><strong>全部文件</strong></span>
+          </button>
+          <button
+            className="row-action"
+            title="全部文件菜单"
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              setAllMenu({ x: event.clientX, y: event.clientY })
+            }}
+          >
+            <MoreHorizontal size={14} />
+          </button>
+          <em className="sidebar-count">{allFilesCount}</em>
+        </div>
 
         <div className="root-folder-list">
           {ordered.map((folder) => {
@@ -115,11 +132,11 @@ export function RootFolderSidebar() {
                       <strong>{folder.name}</strong>
                       <small title={folder.path}>{compactPath(folder.path)}</small>
                     </span>
-                    <em>{flattenFiles(folder.tree ?? [], folder.path).length}</em>
                   </button>
                   <button className="row-action" title="资料夹菜单" onClick={(event) => openFolderMenu(event, folder)}>
                     <MoreHorizontal size={14} />
                   </button>
+                  <em className="sidebar-count">{countViewableFiles(folder.tree ?? [])}</em>
                 </div>
                 {expanded && <FolderTree nodes={folder.tree ?? []} rootFolderId={folder.id} />}
               </section>
@@ -162,10 +179,47 @@ export function RootFolderSidebar() {
             if (name) renameFolder(menu.folder.id, name)
             setMenu(null)
           }}
+          renameLabel="重命名入口名"
+          onNewFolder={() => {
+            const name = window.prompt('新建文件夹名称', '新建文件夹')
+            const id = createMockSubfolder(menu.folder.id, name ?? undefined)
+            if (id) showToast(`已在“${menu.folder.name}”下模拟新建文件夹`)
+            setMenu(null)
+          }}
+          onNewFile={() => {
+            const name = window.prompt('新建文件名称（不写后缀默认 .md）', '新建笔记.md')
+            const id = createMockFile(menu.folder.id, name ?? undefined)
+            if (id) {
+              openFile(id)
+              showToast(`已在“${menu.folder.name}”下模拟新建文件`)
+            }
+            setMenu(null)
+          }}
           onDelete={() => {
             removeFolder(menu.folder.id)
             showToast('已移除文件夹入口，真实文件未受影响')
             setMenu(null)
+          }}
+          deleteLabel="移除入口"
+        />
+      )}
+      {allMenu && (
+        <ContextMenu
+          x={allMenu.x}
+          y={allMenu.y}
+          onClose={() => setAllMenu(null)}
+          onNewFolder={() => {
+            setNewFolderOpen(true)
+            setAllMenu(null)
+          }}
+          onImportFolder={() => {
+            addMockFolder('导入的资料夹')
+            showToast('已模拟导入文件夹并加入左栏')
+            setAllMenu(null)
+          }}
+          onRefresh={() => {
+            showToast('已重新扫描全部文件（Mock）')
+            setAllMenu(null)
           }}
         />
       )}

@@ -1,6 +1,8 @@
 import { create } from 'zustand'
+import type { FileTreeNode } from '../types/fileTree'
 import type { RootFolder } from '../types/rootFolder'
-import { createMockFolder, mockFileContents, mockRootFolders } from '../utils/mockFileSystem'
+import { getFileKind, isEditableFile, normalizeExtension } from '../utils/fileFilters'
+import { createMockFolder, mockFileContents, mockFileMeta, mockRootFolders } from '../utils/mockFileSystem'
 
 type RootFolderState = {
   folders: RootFolder[]
@@ -8,14 +10,60 @@ type RootFolderState = {
   addMockFolder: (name?: string) => void
   importMockFile: (folderId: string) => string | null
   createMockDocument: (folderId?: string | null) => string | null
+  createMockFile: (folderId: string | null | undefined, name?: string) => string | null
+  createMockSubfolder: (folderId: string | null | undefined, name?: string) => string | null
   removeFolder: (id: string) => void
   renameFolder: (id: string, name: string) => void
+  renameTreeFolder: (id: string, name: string) => void
   renameFile: (id: string, name: string) => void
   removeFile: (id: string) => void
+  removeTreeNode: (id: string) => void
   restoreFile: (rootFolderId: string, parentId: string | undefined, node: NonNullable<RootFolder['tree']>[number]) => void
   selectFolder: (id: string) => void
   reorderFolders: (sourceId: string, targetId: string) => void
 }
+
+const uniqueId = (prefix: string) => `${prefix}-${Date.now()}-${Math.round(Math.random() * 1000)}`
+
+const extensionFor = (name: string) => normalizeExtension(name || '未命名.md') || 'md'
+
+const fileNameFor = (name?: string) => {
+  const trimmed = name?.trim() || '新建笔记'
+  return trimmed.includes('.') ? trimmed : `${trimmed}.md`
+}
+
+const updateChildPaths = (node: FileTreeNode): FileTreeNode => ({
+  ...node,
+  children: node.children?.map((child) => updateChildPaths({
+    ...child,
+    path: `${node.path}/${child.name}`,
+  })),
+})
+
+const insertNode = (
+  nodes: FileTreeNode[],
+  targetId: string,
+  nodeFactory: (parentPath: string) => FileTreeNode,
+): { nodes: FileTreeNode[]; createdId: string | null } => {
+  let createdId: string | null = null
+  const nextNodes = nodes.map((item) => {
+    if (item.id === targetId && item.kind === 'directory') {
+      const node = nodeFactory(item.path)
+      createdId = node.id
+      return { ...item, children: [node, ...(item.children ?? [])] }
+    }
+    if (!item.children) return item
+    const result = insertNode(item.children, targetId, nodeFactory)
+    if (result.createdId) createdId = result.createdId
+    return { ...item, children: result.nodes }
+  })
+  return { nodes: nextNodes, createdId }
+}
+
+const removeNodeById = (nodes: FileTreeNode[], id: string): FileTreeNode[] =>
+  nodes
+    .filter((node) => node.id !== id)
+    .map((node) => node.children ? { ...node, children: removeNodeById(node.children, id) } : node)
 
 export const useRootFolderStore = create<RootFolderState>((set) => ({
   folders: mockRootFolders,
@@ -74,6 +122,70 @@ export const useRootFolderStore = create<RootFolderState>((set) => ({
     })
     return createdId
   },
+  createMockFile: (folderId, rawName) => {
+    let createdId: string | null = null
+    const name = fileNameFor(rawName)
+    const extension = extensionFor(name)
+    set((state) => ({
+      folders: state.folders.map((folder) => {
+        const makeNode = (parentPath: string): FileTreeNode => {
+          const id = uniqueId('file-new')
+          const path = `${parentPath}/${name}`
+          createdId = id
+          mockFileMeta[path] = {
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            size: 0,
+          }
+          mockFileContents[id] = isEditableFile(name)
+            ? `# ${name.replace(/\.(md|markdown)$/i, '')}\n\n`
+            : getFileKind(extension) === 'json'
+              ? '{\n  "createdBy": "Jsondown mock"\n}'
+              : ''
+          return { id, name, path, kind: 'file', extension }
+        }
+
+        if (!folderId || folderId === 'all' || folder.id === folderId) {
+          const node = makeNode(folder.path)
+          return { ...folder, tree: [node, ...(folder.tree ?? [])] }
+        }
+
+        const result = insertNode(folder.tree ?? [], folderId, makeNode)
+        return result.createdId ? { ...folder, tree: result.nodes } : folder
+      }),
+      activeFolderId: folderId && folderId !== 'all' ? folderId : state.activeFolderId,
+    }))
+    return createdId
+  },
+  createMockSubfolder: (folderId, rawName) => {
+    let createdId: string | null = null
+    const name = rawName?.trim() || '新建文件夹'
+    set((state) => ({
+      folders: state.folders.map((folder) => {
+        const makeNode = (parentPath: string): FileTreeNode => {
+          const id = uniqueId('dir-new')
+          createdId = id
+          return {
+            id,
+            name,
+            path: `${parentPath}/${name}`,
+            kind: 'directory',
+            children: [],
+          }
+        }
+
+        if (!folderId || folderId === 'all' || folder.id === folderId) {
+          const node = makeNode(folder.path)
+          return { ...folder, tree: [node, ...(folder.tree ?? [])] }
+        }
+
+        const result = insertNode(folder.tree ?? [], folderId, makeNode)
+        return result.createdId ? { ...folder, tree: result.nodes } : folder
+      }),
+      activeFolderId: createdId ?? state.activeFolderId,
+    }))
+    return createdId
+  },
   removeFolder: (id) =>
     set((state) => {
       const folders = state.folders.filter((folder) => folder.id !== id)
@@ -88,6 +200,23 @@ export const useRootFolderStore = create<RootFolderState>((set) => ({
       folders: state.folders.map((folder) =>
         folder.id === id ? { ...folder, name: name.trim() || folder.name } : folder),
     })),
+  renameTreeFolder: (id, name) =>
+    set((state) => {
+      const renameNodes = (nodes: FileTreeNode[]): FileTreeNode[] =>
+        nodes.map((node) => {
+          if (node.id === id && node.kind === 'directory') {
+            const parent = node.path.slice(0, node.path.lastIndexOf('/'))
+            return updateChildPaths({ ...node, name, path: `${parent}/${name}` })
+          }
+          return node.children ? { ...node, children: renameNodes(node.children) } : node
+        })
+      return {
+        folders: state.folders.map((folder) => ({
+          ...folder,
+          tree: renameNodes(folder.tree ?? []),
+        })),
+      }
+    }),
   renameFile: (id, name) =>
     set((state) => {
       const renameNodes = (nodes: NonNullable<RootFolder['tree']>): NonNullable<RootFolder['tree']> =>
@@ -107,17 +236,21 @@ export const useRootFolderStore = create<RootFolderState>((set) => ({
     }),
   removeFile: (id) =>
     set((state) => {
-      const removeFromNodes = (nodes: NonNullable<RootFolder['tree']>): NonNullable<RootFolder['tree']> =>
-        nodes
-          .filter((node) => node.id !== id)
-          .map((node) => node.children ? { ...node, children: removeFromNodes(node.children) } : node)
       return {
         folders: state.folders.map((folder) => ({
           ...folder,
-          tree: removeFromNodes(folder.tree ?? []),
+          tree: removeNodeById(folder.tree ?? [], id),
         })),
       }
     }),
+  removeTreeNode: (id) =>
+    set((state) => ({
+      folders: state.folders.map((folder) => ({
+        ...folder,
+        tree: removeNodeById(folder.tree ?? [], id),
+      })),
+      activeFolderId: state.activeFolderId === id ? 'all' : state.activeFolderId,
+    })),
   restoreFile: (rootFolderId, parentId, node) =>
     set((state) => {
       const addToParent = (

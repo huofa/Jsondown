@@ -98,3 +98,21 @@ export function findParentFolderId(nodes: FileTreeNode[], fileId: string, parent
   }
   return undefined
 }
+
+export function findNodeById(nodes: FileTreeNode[], id: string): FileTreeNode | null {
+  for (const node of nodes) {
+    if (node.id === id) return node
+    if (node.children) {
+      const result = findNodeById(node.children, id)
+      if (result) return result
+    }
+  }
+  return null
+}
+
+export function countViewableFiles(nodes: FileTreeNode[]): number {
+  return nodes.reduce((sum, node) => {
+    if (node.kind === 'file') return sum + (isViewableFile(node.name) ? 1 : 0)
+    return sum + countViewableFiles(node.children ?? [])
+  }, 0)
+}

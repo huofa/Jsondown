@@ -17,7 +17,7 @@ export function RecentlyDeletedPane() {
       {files.map((file) => (
         <article key={file.id} className="deleted-card">
           <strong>{file.name}</strong>
-          <p>{extractMarkdownSummary(file.content)}</p>
+          <p>{file.kind === 'directory' ? `文件夹 · 原位置 ${file.originalPath}` : extractMarkdownSummary(file.content)}</p>
           <time>{new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric' }).format(new Date(file.deletedAt))}</time>
           <div>
             <button
@@ -35,7 +35,7 @@ export function RecentlyDeletedPane() {
               className="danger"
               onClick={() => {
                 permanentlyDeleteFile(file.id)
-                showToast('已永久删除 Mock 文件')
+                showToast('已永久删除 Mock 项目')
               }}
             >
               <Trash2 size={12} />永久删除
