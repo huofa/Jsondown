@@ -44,7 +44,7 @@ export function FileCard({
   onOpen,
   onContextMenu,
 }: FileCardProps) {
-  const title = preview?.title || file.name.replace(/\.(md|markdown)$/i, '')
+  const title = file.name.replace(/\.(md|markdown)$/i, '')
   const summary = file.kind === 'image'
     ? '图片文件'
     : previewStatus === 'loading'
