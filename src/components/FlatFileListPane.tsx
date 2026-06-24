@@ -54,6 +54,7 @@ export function FlatFileListPane() {
   const deletedCount = useRecentlyDeletedStore((state) => state.recentlyDeletedFiles.length)
   const [sortOpen, setSortOpen] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; file: EditableFile } | null>(null)
+  const listRef = useRef<HTMLDivElement>(null)
   const fileCardRefs = useRef(new Map<string, HTMLDivElement>())
 
   const selectedFolder = getFolderSelection(folders, activeFolderId)
@@ -110,9 +111,14 @@ export function FlatFileListPane() {
 
   useEffect(() => {
     if (!activeFileId) return
+    const list = listRef.current
     const target = fileCardRefs.current.get(activeFileId)
-    if (!target) return
+    if (!list || !target) return
     window.requestAnimationFrame(() => {
+      const listRect = list.getBoundingClientRect()
+      const targetRect = target.getBoundingClientRect()
+      const isFullyVisible = targetRect.top >= listRect.top && targetRect.bottom <= listRect.bottom
+      if (isFullyVisible) return
       target.scrollIntoView({ block: 'center', behavior: 'smooth' })
     })
   }, [activeFileId, activeFileIndex, activeFolderId, query, sortMode])
@@ -159,7 +165,7 @@ export function FlatFileListPane() {
       {isRecentlyDeleted ? (
         <RecentlyDeletedPane />
       ) : (
-        <div className="file-list" role="listbox" onScroll={handleListScroll}>
+        <div ref={listRef} className="file-list" role="listbox" onScroll={handleListScroll}>
           {files.map((file) => (
             (() => {
               const preview = previews[getPreviewKey(file)]
