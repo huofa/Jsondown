@@ -1,19 +1,26 @@
 .milkdown-host, .milkdown-host .milkdown { min-height: 0; color: inherit; background: transparent !important; }
 .milkdown-host .milkdown { border: 0 !important; box-shadow: none !important; }
 
-.milkdown-host .ProseMirror {
+.milkdown-host .ProseMirror,
+.milkdown-host [contenteditable="true"] {
   min-height: 1.82em;
   padding: 0 !important;
   outline: none;
   color: inherit;
   caret-color: #9e6f2e;
   font-family: ui-serif, "New York", "Iowan Old Style", "Songti SC", Georgia, serif;
-  font-size: var(--custom-editor-font-size);
-  line-height: var(--custom-editor-line-height);
-  letter-spacing: var(--custom-editor-letter-spacing);
+  font-size: var(--custom-editor-font-size) !important;
+  line-height: var(--custom-editor-line-height) !important;
+  letter-spacing: var(--custom-editor-letter-spacing) !important;
 }
 
 .milkdown-host .ProseMirror > *:first-child { margin-top: 0; }
+.milkdown-host .ProseMirror p,
+.milkdown-host .ProseMirror li {
+  font-size: inherit !important;
+  line-height: inherit !important;
+  letter-spacing: inherit !important;
+}
 .milkdown-host .ProseMirror p { margin: .76em 0; }
 .milkdown-host .ProseMirror h1,
 .milkdown-host .ProseMirror h2,

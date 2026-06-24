@@ -27,6 +27,7 @@ export function EditorPane() {
   const theme = useThemeStore((state) => state.theme)
   const [editorApi, setEditorApi] = useState<EditorCommandApi | null>(null)
   const saveTimer = useRef<number | undefined>(undefined)
+  const editorScrollRef = useRef<HTMLDivElement>(null)
 
   const allFiles = useMemo(
     () => folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id)),
@@ -59,6 +60,37 @@ export function EditorPane() {
         openFile(id)
         showToast('已新建 Markdown 笔记')
       }
+    })
+  }
+
+  const updateEditorContent = (id: string, markdown: string) => {
+    const scroll = editorScrollRef.current
+    const beforeTop = scroll?.scrollTop ?? 0
+    const beforeHeight = scroll?.scrollHeight ?? 0
+    const isNearBottom = scroll
+      ? beforeTop + scroll.clientHeight >= beforeHeight - 80
+      : false
+
+    updateContent(id, markdown)
+
+    const restoreScroll = () => {
+      const current = editorScrollRef.current
+      if (!current) return
+      const contentFitsFirstScreen = current.scrollHeight <= current.clientHeight + 6
+      if (contentFitsFirstScreen) {
+        current.scrollTop = 0
+        return
+      }
+      if (beforeTop <= 2) {
+        current.scrollTop = 0
+        return
+      }
+      if (!isNearBottom) current.scrollTop = beforeTop
+    }
+
+    window.requestAnimationFrame(() => {
+      restoreScroll()
+      window.setTimeout(restoreScroll, 0)
     })
   }
 
@@ -96,7 +128,7 @@ export function EditorPane() {
           <p>Markdown 文件可以直接编辑，代码、文本与图片会以只读方式打开。</p>
         </div>
       ) : (
-        <div className="editor-scroll">
+        <div ref={editorScrollRef} className="editor-scroll">
           <div className="note-created-time">{formatDisplayTime(file.createdAt ?? file.updatedAt ?? new Date().toISOString())}</div>
           {file.editable ? (
             <article className="paper">
@@ -104,7 +136,7 @@ export function EditorPane() {
                 key={file.id}
                 value={content}
                 onReady={setEditorApi}
-                onChange={(markdown) => updateContent(file.id, markdown)}
+                onChange={(markdown) => updateEditorContent(file.id, markdown)}
               />
             </article>
           ) : file.kind === 'image' ? (

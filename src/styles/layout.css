@@ -373,6 +373,12 @@
   .paper { padding-inline: 20px; }
 }
 
+.editor-shell {
+  --custom-editor-font-size: 16px;
+  --custom-editor-line-height: 1.82;
+  --custom-editor-letter-spacing: .1px;
+  --custom-editor-horizontal-padding: 22px;
+}
 .paper {
   padding-inline: var(--custom-editor-horizontal-padding);
 }
