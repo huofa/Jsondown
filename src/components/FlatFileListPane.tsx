@@ -18,6 +18,7 @@ import {
 import type { EditableFile, SortMode } from '../types/file'
 import { findParentFolderId, getDirectFilesForSelection, getFolderSelection } from '../utils/folderSelection'
 import { flattenFiles } from '../utils/flattenFiles'
+import { startWindowDrag } from '../utils/windowDrag'
 import { ContextMenu } from './ContextMenu'
 import { FileCard } from './FileCard'
 import { RecentlyDeletedPane } from './RecentlyDeletedPane'
@@ -147,10 +148,10 @@ export function FlatFileListPane() {
 
   return (
     <div className="file-list-shell">
-      <header className="file-list-header">
-        <div>
-          <span className="eyebrow">{isAllFiles ? '所有资料夹' : isRecentlyDeleted ? '删除缓冲区' : '当前资料夹'}</span>
-          <h2>{title}</h2>
+      <header className="file-list-header" data-tauri-drag-region onPointerDownCapture={startWindowDrag}>
+        <div className="file-list-title-zone" data-tauri-drag-region>
+          <span className="eyebrow" data-tauri-drag-region>{isAllFiles ? '所有资料夹' : isRecentlyDeleted ? '删除缓冲区' : '当前资料夹'}</span>
+          <h2 data-tauri-drag-region>{title}</h2>
         </div>
         <span className="file-count">
           {isRecentlyDeleted ? deletedCount : files.length}

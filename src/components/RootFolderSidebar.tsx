@@ -20,6 +20,7 @@ import type { RootFolder } from '../types/rootFolder'
 import { flattenFiles } from '../utils/flattenFiles'
 import { compactPath } from '../utils/formatDisplayTime'
 import { countViewableFiles } from '../utils/folderSelection'
+import { startWindowDrag } from '../utils/windowDrag'
 import { ContextMenu } from './ContextMenu'
 import { FolderTree } from './FolderTree'
 import { ImportFileDialog } from './ImportFileDialog'
@@ -139,9 +140,9 @@ export function RootFolderSidebar() {
 
   return (
     <div className="sidebar-shell">
-      <header className="sidebar-header">
-        <div>
-          <span className="eyebrow">JSONDOWN</span>
+      <header className="sidebar-header" data-tauri-drag-region onPointerDownCapture={startWindowDrag}>
+        <div className="sidebar-title-zone" data-tauri-drag-region>
+          <span className="sidebar-brand-text" data-tauri-drag-region>JSONDOWN</span>
         </div>
         <div className="sidebar-actions">
           <button className="icon-button" onClick={() => setNewFolderOpen(true)} title="新建资料夹">

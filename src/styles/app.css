@@ -13,6 +13,39 @@ html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 button, input, select { font: inherit; }
 button { color: inherit; }
 
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+}
+
+button,
+input,
+select,
+textarea,
+a,
+[role="button"],
+.icon-button,
+.tiny-icon-button,
+.top-editor-toolbar,
+.top-editor-toolbar *,
+.editor-actions,
+.editor-actions *,
+.sidebar-actions,
+.sidebar-actions *,
+.file-list-tools,
+.file-list-tools *,
+.sort-control,
+.sort-control *,
+.search-field,
+.search-field *,
+.density-switcher,
+.density-switcher *,
+.theme-switcher,
+.theme-switcher *,
+.color-menu,
+.color-menu * {
+  -webkit-app-region: no-drag;
+}
+
 button:focus-visible, input:focus-visible {
   outline: 2px solid rgba(180, 126, 45, .48);
   outline-offset: 1px;
