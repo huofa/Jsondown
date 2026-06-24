@@ -373,17 +373,13 @@
   .paper { padding-inline: 20px; }
 }
 
-/* Layout density presets — custom currently inherits comfortable values. */
-.density-compact .paper { max-width: 1120px; padding-inline: clamp(10px, 1.3vw, 18px); }
-.density-compact .top-editor-toolbar { height: 27px; }
-.density-compact .top-editor-toolbar button { width: 22px; height: 21px; }
-
-.density-comfortable .paper,
-.density-custom .paper { max-width: 1080px; }
-.density-custom .paper {
+.paper {
   padding-inline: var(--custom-editor-horizontal-padding);
 }
 
-.density-loose .paper { max-width: 920px; margin-inline: auto; padding-inline: clamp(28px, 4vw, 54px); }
+/* Legacy density presets now only keep toolbar density. */
+.density-compact .top-editor-toolbar { height: 27px; }
+.density-compact .top-editor-toolbar button { width: 22px; height: 21px; }
+
 .density-loose .top-editor-toolbar { height: 34px; }
 .density-loose .top-editor-toolbar button { width: 27px; height: 27px; }

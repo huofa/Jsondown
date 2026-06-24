@@ -8,9 +8,9 @@
   color: inherit;
   caret-color: #9e6f2e;
   font-family: ui-serif, "New York", "Iowan Old Style", "Songti SC", Georgia, serif;
-  font-size: 16px;
-  line-height: 1.82;
-  letter-spacing: .006em;
+  font-size: var(--custom-editor-font-size);
+  line-height: var(--custom-editor-line-height);
+  letter-spacing: var(--custom-editor-letter-spacing);
 }
 
 .milkdown-host .ProseMirror > *:first-child { margin-top: 0; }
@@ -40,16 +40,6 @@
 .milkdown-host .ProseMirror pre { border: 1px solid rgba(70,64,56,.12) !important; border-radius: 8px !important; background: #242527 !important; box-shadow: none !important; }
 .milkdown-host .ProseMirror hr { margin: 2em 0; border: 0; border-top: 1px solid rgba(70,62,52,.13); }
 .milkdown-host .ProseMirror table { font-family: ui-sans-serif, -apple-system, sans-serif; font-size: 13px; }
-
-.density-compact .milkdown-host .ProseMirror { font-size: 15px; line-height: 1.58; }
-.density-compact .milkdown-host .ProseMirror p { margin: .48em 0; }
-.density-loose .milkdown-host .ProseMirror { font-size: 17px; line-height: 1.95; }
-.density-loose .milkdown-host .ProseMirror p { margin: 1em 0; }
-.density-custom .milkdown-host .ProseMirror {
-  font-size: var(--custom-editor-font-size);
-  line-height: var(--custom-editor-line-height);
-  letter-spacing: var(--custom-editor-letter-spacing);
-}
 
 .milkdown-host [data-milkdown-root] { background: transparent !important; }
 .milkdown-host milkdown-block-handle,

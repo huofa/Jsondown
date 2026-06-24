@@ -85,13 +85,13 @@
   cursor: pointer;
 }
 .density-menu { position: absolute; z-index: 50; top: 30px; right: 0; width: 184px; padding: 4px; border: 1px solid #ded8cf; border-radius: 10px; background: rgba(255,255,255,.97); box-shadow: 0 10px 28px rgba(55,47,39,.14); }
+.typography-menu { width: 180px; }
 .density-menu button { width: 100%; padding: 6px 8px; border: 0; border-radius: 5px; color: #686159; background: transparent; font-size: 10px; text-align: left; cursor: pointer; }
 .density-menu button:hover, .density-menu button.is-active { background: #eeeae4; }
 .density-custom-panel {
   display: grid;
   gap: 8px;
   padding: 8px 7px 7px;
-  border-top: 1px solid rgba(84,74,61,.1);
 }
 .density-custom-panel label {
   display: grid;
