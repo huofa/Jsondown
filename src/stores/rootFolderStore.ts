@@ -91,7 +91,7 @@ const removeNodeById = (nodes: FileTreeNode[], id: string): FileTreeNode[] =>
 
 const findNodeById = (nodes: FileTreeNode[], id: string): FileTreeNode | null => {
   for (const node of nodes) {
-    if (node.id === id) return node
+    if (node.id === id || node.path === id) return node
     if (node.children) {
       const found = findNodeById(node.children, id)
       if (found) return found
@@ -100,9 +100,20 @@ const findNodeById = (nodes: FileTreeNode[], id: string): FileTreeNode | null =>
   return null
 }
 
+const findNodeByPath = (nodes: FileTreeNode[], path: string): FileTreeNode | null => {
+  for (const node of nodes) {
+    if (node.path === path) return node
+    if (node.children) {
+      const found = findNodeByPath(node.children, path)
+      if (found) return found
+    }
+  }
+  return null
+}
+
 const findRootForSelection = (folders: RootFolder[], id?: string | null) => {
   if (!id || id === 'all' || id === 'recently-deleted') return folders[0]
-  const direct = folders.find((folder) => folder.id === id)
+  const direct = folders.find((folder) => folder.id === id || folder.path === id)
   if (direct) return direct
   return folders.find((folder) => Boolean(findNodeById(folder.tree ?? [], id)))
 }
@@ -298,10 +309,15 @@ export const useRootFolderStore = create<RootFolderState>((set, get) => ({
   renameTreeFolder: async (id, name) => {
     const root = findRootForSelection(get().folders, id)
     const node = root ? findNodeById(root.tree ?? [], id) : null
-    if (!root || !node) return
+    if (!root || !node) throw new Error('未找到要重命名的文件夹')
     if (isTauriRuntime()) {
-      await renamePath(node.path, name)
-      await get().refreshRootFolder(root.id)
+      const nextPath = await renamePath(node.path, name)
+      const refreshed = await refreshFolder(root)
+      const nextNode = findNodeByPath(refreshed.tree ?? [], nextPath)
+      set((state) => ({
+        folders: state.folders.map((folder) => (folder.id === root.id ? refreshed : folder)),
+        activeFolderId: state.activeFolderId === id ? (nextNode?.id ?? state.activeFolderId) : state.activeFolderId,
+      }))
       return
     }
     set((state) => {
@@ -319,12 +335,16 @@ export const useRootFolderStore = create<RootFolderState>((set, get) => ({
   renameFile: async (id, name) => {
     const root = findRootForSelection(get().folders, id)
     const node = root ? findNodeById(root.tree ?? [], id) : null
-    if (!root || !node) return null
+    if (!root || !node) throw new Error('未找到要重命名的文件')
     const nextName = renameFileNameFor(node.name, name)
     if (isTauriRuntime()) {
       const nextPath = await renamePath(node.path, nextName)
-      await get().refreshRootFolder(root.id)
-      return nextPath
+      const refreshed = await refreshFolder(root)
+      const nextNode = findNodeByPath(refreshed.tree ?? [], nextPath)
+      set((state) => ({
+        folders: state.folders.map((folder) => (folder.id === root.id ? refreshed : folder)),
+      }))
+      return nextNode?.id ?? nextPath
     }
     set((state) => {
       const renameNodes = (nodes: FileTreeNode[]): FileTreeNode[] =>

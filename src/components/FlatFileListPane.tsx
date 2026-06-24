@@ -22,6 +22,7 @@ import { startWindowDrag } from '../utils/windowDrag'
 import { ContextMenu } from './ContextMenu'
 import { FileCard } from './FileCard'
 import { RecentlyDeletedPane } from './RecentlyDeletedPane'
+import { RenameDialog } from './RenameDialog'
 import { showToast } from './Toast'
 
 const sortLabels: Record<SortMode, string> = {
@@ -55,6 +56,7 @@ export function FlatFileListPane() {
   const deletedCount = useRecentlyDeletedStore((state) => state.recentlyDeletedFiles.length)
   const [sortOpen, setSortOpen] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; file: EditableFile } | null>(null)
+  const [renameTarget, setRenameTarget] = useState<EditableFile | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const sortRef = useRef<HTMLDivElement>(null)
   const fileCardRefs = useRef(new Map<string, HTMLDivElement>())
@@ -237,13 +239,7 @@ export function FlatFileListPane() {
             setMenu(null)
           }}
           onRename={() => {
-            const name = window.prompt('重命名文件', menu.file.name)
-            if (name) {
-              void renameFile(menu.file.id, name).then((nextId) => {
-                if (nextId && activeFileId === menu.file.id) openFile(nextId)
-                showToast('已重命名文件')
-              })
-            }
+            setRenameTarget(menu.file)
             setMenu(null)
           }}
           onDelete={() => {
@@ -286,6 +282,22 @@ export function FlatFileListPane() {
           deleteLabel="移到最近删除"
         />
       )}
+      <RenameDialog
+        open={Boolean(renameTarget)}
+        title="重命名文件"
+        kind="file"
+        initialName={renameTarget?.name ?? ''}
+        onClose={() => setRenameTarget(null)}
+        onRename={async (name) => {
+          if (!renameTarget) return
+          const nextId = await renameFile(renameTarget.path, name)
+          if (nextId && activeFileId === renameTarget.id) {
+            removeContent(renameTarget.id)
+            openFile(nextId)
+          }
+          showToast('已重命名文件')
+        }}
+      />
     </div>
   )
 }

@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 use std::path::Path;
 
 use crate::models::file_tree::{FileTreeKind, FileTreeNode};
-use crate::utils::ignore_rules::{extension, is_supported_text_file};
+use crate::utils::ignore_rules::{extension, is_supported_text_file, should_ignore};
 use crate::utils::path_utils::{ensure_child_name, file_name as path_file_name, metadata_times, path_to_string};
 
 #[derive(serde::Serialize)]
@@ -241,9 +241,24 @@ pub fn rename_path(old_path: String, new_name: String) -> Result<String, String>
     if name.is_empty() {
         return Err("新名称不能为空".to_string());
     }
+    if name == "." || name == ".." {
+        return Err("新名称不能为 . 或 ..".to_string());
+    }
+    if name.contains('/') || name.contains('\\') {
+        return Err("新名称不能包含路径分隔符".to_string());
+    }
     let old = Path::new(&old_path);
+    if !old.exists() {
+        return Err("要重命名的文件或文件夹不存在".to_string());
+    }
+    if should_ignore(old) {
+        return Err("该路径不允许重命名".to_string());
+    }
     let parent = old.parent().ok_or_else(|| "无法获取父路径".to_string())?;
     let new_path = parent.join(name);
+    if should_ignore(&new_path) {
+        return Err("目标名称不允许使用".to_string());
+    }
     if new_path.exists() {
         return Err("目标名称已存在".to_string());
     }
