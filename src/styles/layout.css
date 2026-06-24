@@ -380,6 +380,10 @@
 
 .density-comfortable .paper,
 .density-custom .paper { max-width: 1080px; }
+.density-custom .paper {
+  max-width: var(--custom-editor-max-width);
+  padding-inline: var(--custom-editor-horizontal-padding);
+}
 
 .density-loose .paper { max-width: 920px; margin-inline: auto; padding-inline: clamp(28px, 4vw, 54px); }
 .density-loose .top-editor-toolbar { height: 34px; }

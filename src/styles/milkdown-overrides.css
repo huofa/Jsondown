@@ -45,6 +45,13 @@
 .density-compact .milkdown-host .ProseMirror p { margin: .48em 0; }
 .density-loose .milkdown-host .ProseMirror { font-size: 17px; line-height: 1.95; }
 .density-loose .milkdown-host .ProseMirror p { margin: 1em 0; }
+.density-custom .milkdown-host .ProseMirror {
+  font-size: var(--custom-editor-font-size);
+  line-height: var(--custom-editor-line-height);
+}
+.density-custom .milkdown-host .ProseMirror p {
+  margin: var(--custom-editor-paragraph-spacing) 0;
+}
 
 .milkdown-host [data-milkdown-root] { background: transparent !important; }
 .milkdown-host milkdown-block-handle,

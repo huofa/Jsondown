@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type CSSProperties } from 'react'
 import { EditorPane } from './components/EditorPane'
 import { FlatFileListPane } from './components/FlatFileListPane'
 import { ResizablePanels } from './components/ResizablePanels'
@@ -21,6 +21,7 @@ export default function App() {
   const closeFile = useEditorStore((state) => state.closeFile)
   const setSaveStatus = useEditorStore((state) => state.setSaveStatus)
   const layoutDensity = useSettingsStore((state) => state.layoutDensity)
+  const customEditorLayout = useSettingsStore((state) => state.customEditorLayout)
   const loadRecentlyDeleted = useRecentlyDeletedStore((state) => state.loadRecentlyDeleted)
   const watcherRefreshTimer = useRef<number | undefined>(undefined)
   const foldersRef = useRef(folders)
@@ -74,7 +75,16 @@ export default function App() {
   }, [activeFileId, activeFolderId, closeFile, folders, openFile])
 
   return (
-    <div className={`app-frame density-${layoutDensity}`}>
+    <div
+      className={`app-frame density-${layoutDensity}`}
+      style={{
+        '--custom-editor-font-size': `${customEditorLayout.fontSize}px`,
+        '--custom-editor-line-height': customEditorLayout.lineHeight,
+        '--custom-editor-paragraph-spacing': `${customEditorLayout.paragraphSpacing}em`,
+        '--custom-editor-horizontal-padding': `${customEditorLayout.horizontalPadding}px`,
+        '--custom-editor-max-width': `${customEditorLayout.maxWidth}px`,
+      } as CSSProperties}
+    >
       <ResizablePanels
         left={<RootFolderSidebar />}
         middle={<FlatFileListPane />}
