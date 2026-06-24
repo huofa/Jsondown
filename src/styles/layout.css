@@ -574,6 +574,7 @@
 .native-dialog label { display: grid; gap: 6px; color: #746d65; font-size: 10px; }
 .native-dialog input { height: 31px; padding: 0 9px; border: 1px solid #d8d3ca; border-radius: 6px; outline: 0; background: white; font-size: 12px; }
 .native-dialog input:focus { border-color: #b89a6b; box-shadow: 0 0 0 3px rgba(184,154,107,.12); }
+.dialog-error { margin-top: 9px; color: #b05b4e; font-size: 11px; line-height: 1.4; }
 .mock-location, .mock-file-choice { margin-top: 10px; padding: 9px 10px; border-radius: 7px; color: #8c857d; background: #f0ede7; font-size: 10px; }
 .mock-file-choice { display: flex; align-items: center; gap: 8px; }
 .dialog-symbol { display: grid; place-items: center; width: 37px; height: 37px; margin-bottom: 12px; border-radius: 10px; color: #827058; background: #eee7dc; }

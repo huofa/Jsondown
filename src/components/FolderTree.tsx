@@ -13,6 +13,7 @@ import {
 import { isViewableFile } from '../utils/fileFilters'
 import { countViewableFiles, findParentFolderId } from '../utils/folderSelection'
 import { ContextMenu } from './ContextMenu'
+import { RenameDialog } from './RenameDialog'
 import { showToast } from './Toast'
 
 type FolderTreeProps = {
@@ -40,6 +41,7 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
     createMockFile,
     createMockSubfolder,
     removeTreeNode,
+    renameFile,
     renameTreeFolder,
     refreshRootFolder,
     selectFolder,
@@ -47,6 +49,7 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
   const loadRecentlyDeleted = useRecentlyDeletedStore((state) => state.loadRecentlyDeleted)
   const moveToRecentlyDeleted = useRecentlyDeletedStore((state) => state.moveToRecentlyDeleted)
   const [menu, setMenu] = useState<{ x: number; y: number; node: FileTreeNode } | null>(null)
+  const [renameTarget, setRenameTarget] = useState<FileTreeNode | null>(null)
 
   const openFolderMenu = (event: MouseEvent, node: FileTreeNode) => {
     event.preventDefault()
@@ -103,6 +106,7 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
               selectFolder(parentFolderId ?? rootFolderId ?? 'all')
               openFile(node.id)
             }}
+            onContextMenu={(event) => openFolderMenu(event, node)}
             title={node.path}
           >
             <TreeFileIcon extension={node.extension} />
@@ -122,20 +126,16 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
               .finally(() => setMenu(null))
           }}
           onRename={() => {
-            const name = window.prompt('重命名文件夹', menu.node.name)
-            if (name) {
-              void renameTreeFolder(menu.node.id, name)
-                .then(() => showToast('已重命名文件夹'))
-            }
+            setRenameTarget(menu.node)
             setMenu(null)
           }}
-          onNewFolder={() => {
+          onNewFolder={menu.node.kind === 'directory' ? () => {
             const name = window.prompt('新建文件夹名称', '新建文件夹')
             void createMockSubfolder(menu.node.id, name ?? undefined)
               .then((id) => { if (id) showToast(`已在“${menu.node.name}”下新建文件夹`) })
             setMenu(null)
-          }}
-          onNewFile={() => {
+          } : undefined}
+          onNewFile={menu.node.kind === 'directory' ? () => {
             const name = window.prompt('新建文件名称（不写后缀默认 .md）', '新建笔记.md')
             void createMockFile(menu.node.id, name ?? undefined).then((id) => {
               if (id) {
@@ -144,7 +144,7 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
               }
             })
             setMenu(null)
-          }}
+          } : undefined}
           onDelete={() => {
             void (async () => {
               const root = folders.find((folder) => folder.id === rootFolderId)
@@ -162,22 +162,40 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
                   originalRootFolderId: rootFolderId,
                   originalParentId: parentId,
                   deletedAt: new Date().toISOString(),
-                  extension: '',
-                  kind: 'directory',
+                  extension: menu.node.extension ?? '',
+                  kind: menu.node.kind,
                   editable: false,
                   content: '',
                   node: menu.node,
                 })
                 removeTreeNode(menu.node.id)
               }
-              closeFile()
-              showToast('已将文件夹移到最近删除')
+              if (activeFileId === menu.node.id) closeFile()
+              showToast(menu.node.kind === 'directory' ? '已将文件夹移到最近删除' : '已将文件移到最近删除')
             })()
             setMenu(null)
           }}
           deleteLabel="移到最近删除"
         />
       )}
+      <RenameDialog
+        open={Boolean(renameTarget)}
+        title={renameTarget?.kind === 'directory' ? '重命名文件夹' : '重命名文件'}
+        kind={renameTarget?.kind ?? 'file'}
+        initialName={renameTarget?.name ?? ''}
+        onClose={() => setRenameTarget(null)}
+        onRename={async (name) => {
+          if (!renameTarget) return
+          if (renameTarget.kind === 'directory') {
+            await renameTreeFolder(renameTarget.path, name)
+            showToast('已重命名文件夹')
+            return
+          }
+          const nextId = await renameFile(renameTarget.path, name)
+          if (nextId && activeFileId === renameTarget.id) openFile(nextId)
+          showToast('已重命名文件')
+        }}
+      />
     </div>
   )
 }
