@@ -45,12 +45,10 @@ export function MilkdownEditor({ value, onChange, onReady }: MilkdownEditorProps
         [CrepeFeature.AI]: false,
         [CrepeFeature.Latex]: false,
         [CrepeFeature.TopBar]: false,
+        [CrepeFeature.Toolbar]: false,
+        [CrepeFeature.LinkTooltip]: false,
         [CrepeFeature.BlockEdit]: false,
-      },
-      featureConfigs: {
-        [CrepeFeature.Placeholder]: {
-          text: '开始写作，或输入 / 插入内容…',
-        },
+        [CrepeFeature.Placeholder]: false,
       },
     })
 

@@ -45,7 +45,7 @@ export function EditorPane() {
     window.clearTimeout(saveTimer.current)
     saveTimer.current = window.setTimeout(() => {
       void saveFileContent(file.id, file.path)
-    }, 800)
+    }, 2500)
     return () => window.clearTimeout(saveTimer.current)
   }, [content, file?.editable, file?.id, file?.path, saveFileContent, saveStatus])
 

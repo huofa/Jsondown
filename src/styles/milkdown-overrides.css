@@ -56,3 +56,19 @@
   background: rgba(255,255,255,.96) !important;
   box-shadow: 0 10px 30px rgba(55,46,37,.13) !important;
 }
+
+.milkdown-host [data-placeholder]::before,
+.milkdown-host .ProseMirror p.is-empty::before,
+.milkdown-host .ProseMirror .is-empty::before,
+.milkdown-host .placeholder,
+.milkdown-host [class*="placeholder" i],
+.milkdown-host [data-milkdown-component*="tooltip" i],
+.milkdown-host [data-milkdown-component*="bubble" i],
+.milkdown-host [data-milkdown-component*="floating" i],
+.milkdown-host .milkdown-tooltip,
+.milkdown-host .milkdown-menu,
+.milkdown-host .milkdown-toolbar,
+.milkdown-host [role="tooltip"] {
+  display: none !important;
+  content: none !important;
+}

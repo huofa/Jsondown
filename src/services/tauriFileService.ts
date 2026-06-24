@@ -9,6 +9,7 @@ import { createMockFolder, mockFileContents, mockRootFolders } from '../utils/mo
 type SaveResult = {
   ok: boolean
   savedAt: string
+  updatedAt?: string
 }
 
 export type FilePreviewPayload = {
@@ -26,6 +27,18 @@ export type FileWatchPayload = {
 
 export const isTauriRuntime = () =>
   typeof window !== 'undefined' && Boolean((window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__)
+
+const recentlySaved = new Map<string, number>()
+const writeQueues = new Map<string, Promise<unknown>>()
+
+export function markRecentlySaved(path: string) {
+  recentlySaved.set(path, Date.now())
+}
+
+export function isRecentlySelfSaved(path: string, windowMs = 2000) {
+  const savedAt = recentlySaved.get(path)
+  return Boolean(savedAt && Date.now() - savedAt <= windowMs)
+}
 
 const fallbackConfig: AppConfig = {
   rootFolders: mockRootFolders,
@@ -98,8 +111,23 @@ export async function readFilePreview(
 }
 
 export async function writeTextFile(path: string, content: string): Promise<SaveResult> {
-  if (!isTauriRuntime()) return { ok: true, savedAt: new Date().toISOString() }
-  return invoke<SaveResult>('write_text_file', { path, content })
+  const previous = writeQueues.get(path) ?? Promise.resolve()
+  let releaseQueue!: () => void
+  const queued = new Promise<void>((resolve) => { releaseQueue = resolve })
+  const chain = previous.catch(() => undefined).then(() => queued)
+  writeQueues.set(path, chain)
+
+  await previous.catch(() => undefined)
+  markRecentlySaved(path)
+  try {
+    if (!isTauriRuntime()) return { ok: true, savedAt: new Date().toISOString() }
+    const result = await invoke<SaveResult>('write_text_file', { path, content })
+    markRecentlySaved(path)
+    return result
+  } finally {
+    releaseQueue()
+    if (writeQueues.get(path) === chain) writeQueues.delete(path)
+  }
 }
 
 export async function revealInFinder(path: string): Promise<void> {

@@ -16,6 +16,15 @@ const relativeTime = (iso?: string) => {
     : new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric' }).format(new Date(iso))
 }
 
+const fullTime = (iso?: string) =>
+  iso ? new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(iso)) : '未知'
+
 type FileCardProps = {
   file: EditableFile
   preview?: FilePreviewPayload
@@ -54,7 +63,9 @@ export function FileCard({
       <span className="file-card-title">{title}</span>
       <span className="file-card-summary">{summary}</span>
       <span className="file-card-footer">
-        <time>{relativeTime(file.updatedAt ?? file.createdAt)}</time>
+        <time title={`创建：${fullTime(file.createdAt)}\n修改：${fullTime(file.updatedAt)}`}>
+          改 {relativeTime(file.updatedAt ?? file.createdAt)}
+        </time>
         <span className="file-type">{file.extension.toUpperCase()}</span>
         <span className={file.editable ? 'editable' : ''}>{file.editable ? '可编辑' : '只读'}</span>
       </span>

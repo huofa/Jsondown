@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { EditorPane } from './components/EditorPane'
 import { FlatFileListPane } from './components/FlatFileListPane'
 import { ResizablePanels } from './components/ResizablePanels'
@@ -7,7 +7,7 @@ import { useEditorStore } from './stores/editorStore'
 import { useRecentlyDeletedStore } from './stores/recentlyDeletedStore'
 import { useRootFolderStore } from './stores/rootFolderStore'
 import { useSettingsStore } from './stores/settingsStore'
-import { watchPaths } from './services/tauriFileService'
+import { isRecentlySelfSaved, watchPaths } from './services/tauriFileService'
 import { flattenFiles } from './utils/flattenFiles'
 import { getDirectFilesForSelection } from './utils/folderSelection'
 
@@ -22,27 +22,41 @@ export default function App() {
   const setSaveStatus = useEditorStore((state) => state.setSaveStatus)
   const layoutDensity = useSettingsStore((state) => state.layoutDensity)
   const loadRecentlyDeleted = useRecentlyDeletedStore((state) => state.loadRecentlyDeleted)
+  const watcherRefreshTimer = useRef<number | undefined>(undefined)
+  const foldersRef = useRef(folders)
+  const activeFileIdRef = useRef(activeFileId)
+  foldersRef.current = folders
+  activeFileIdRef.current = activeFileId
+  const rootPathsKey = folders.map((folder) => folder.path).join('\n')
 
   useEffect(() => {
     void initialize()
   }, [initialize])
 
   useEffect(() => {
-    const rootPaths = folders.map((folder) => folder.path)
+    const rootPaths = rootPathsKey ? rootPathsKey.split('\n') : []
     void loadRecentlyDeleted(rootPaths)
     let cleanup: (() => void) | null = null
     void watchPaths(rootPaths, (event) => {
-      const activeFile = folders
+      const activeFile = foldersRef.current
         .flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id))
-        .find((file) => file.id === activeFileId)
-      if (activeFile && event.paths.includes(activeFile.path)) {
+        .find((file) => file.id === activeFileIdRef.current)
+      const selfSaveOnly = event.paths.length > 0 && event.paths.every((path) => isRecentlySelfSaved(path))
+      if (activeFile && event.paths.includes(activeFile.path) && !selfSaveOnly) {
         setSaveStatus('external-changed')
       }
-      void refreshAllRootFolders()
-      void loadRecentlyDeleted(rootPaths)
+      if (selfSaveOnly) return
+      window.clearTimeout(watcherRefreshTimer.current)
+      watcherRefreshTimer.current = window.setTimeout(() => {
+        void refreshAllRootFolders()
+        void loadRecentlyDeleted(rootPaths)
+      }, 500)
     }).then((unlisten) => { cleanup = unlisten })
-    return () => cleanup?.()
-  }, [activeFileId, folders, loadRecentlyDeleted, refreshAllRootFolders, setSaveStatus])
+    return () => {
+      window.clearTimeout(watcherRefreshTimer.current)
+      cleanup?.()
+    }
+  }, [loadRecentlyDeleted, refreshAllRootFolders, rootPathsKey, setSaveStatus])
 
   useEffect(() => {
     if (activeFolderId === 'recently-deleted') {

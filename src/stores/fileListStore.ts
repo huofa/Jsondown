@@ -10,7 +10,7 @@ type FileListState = {
 
 export const useFileListStore = create<FileListState>((set) => ({
   query: '',
-  sortMode: 'updatedAt',
+  sortMode: 'updatedAt-desc',
   setQuery: (query) => set({ query }),
   setSortMode: (sortMode) => set({ sortMode }),
 }))

@@ -22,4 +22,11 @@ export type EditableFile = {
   size?: number
 }
 
-export type SortMode = 'updatedAt' | 'name' | 'path'
+export type SortMode =
+  | 'updatedAt-desc'
+  | 'updatedAt-asc'
+  | 'createdAt-desc'
+  | 'createdAt-asc'
+  | 'name-asc'
+  | 'name-desc'
+  | 'path'

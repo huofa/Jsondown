@@ -5,6 +5,8 @@ use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watche
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
+use crate::utils::ignore_rules::has_ignored_component;
+
 #[derive(Default)]
 pub struct WatcherState {
     pub watcher: Mutex<Option<RecommendedWatcher>>,
@@ -28,13 +30,18 @@ fn event_name(kind: &EventKind) -> String {
 }
 
 fn emit_event(app: &AppHandle, event: Event) {
+    let paths: Vec<String> = event
+        .paths
+        .into_iter()
+        .filter(|path| !has_ignored_component(path))
+        .map(|path| path.to_string_lossy().to_string())
+        .collect();
+    if paths.is_empty() {
+        return;
+    }
     let payload = FileWatchEvent {
         event_type: event_name(&event.kind),
-        paths: event
-            .paths
-            .into_iter()
-            .map(|path| path.to_string_lossy().to_string())
-            .collect(),
+        paths,
     };
     let _ = app.emit("jsondown://file-watch", payload);
 }
@@ -68,4 +75,3 @@ pub fn watch_paths(
     *state.watcher.lock().map_err(|err| err.to_string())? = Some(watcher);
     Ok(())
 }
-

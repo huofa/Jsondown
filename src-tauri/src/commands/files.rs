@@ -1,6 +1,6 @@
 use std::fs;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::Path;
 
 use crate::models::file_tree::{FileTreeKind, FileTreeNode};
@@ -12,6 +12,7 @@ use crate::utils::path_utils::{ensure_child_name, file_name as path_file_name, m
 pub struct SaveResult {
     pub ok: bool,
     pub saved_at: String,
+    pub updated_at: Option<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -167,7 +168,7 @@ pub fn read_file_preview(
     let max_lines = max_lines.unwrap_or(2).max(1);
     let mut file = File::open(path_ref).map_err(|err| err.to_string())?;
     let mut bytes = Vec::new();
-    file.by_ref()
+    Read::by_ref(&mut file)
         .take(max_bytes)
         .read_to_end(&mut bytes)
         .map_err(|err| err.to_string())?;
@@ -189,10 +190,26 @@ pub fn write_text_file(path: String, content: String) -> Result<SaveResult, Stri
     if !is_supported_text_file(path) {
         return Err("不支持写入该文件类型".to_string());
     }
-    fs::write(path, content).map_err(|err| err.to_string())?;
+    let tmp_path = path.with_file_name(format!(
+        "{}.jsondown.tmp",
+        path.file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("jsondown-write")
+    ));
+    {
+        let mut file = File::create(&tmp_path).map_err(|err| err.to_string())?;
+        file.write_all(content.as_bytes()).map_err(|err| err.to_string())?;
+        file.sync_all().map_err(|err| err.to_string())?;
+    }
+    fs::rename(&tmp_path, path).map_err(|err| {
+        let _ = fs::remove_file(&tmp_path);
+        err.to_string()
+    })?;
+    let (_, updated_at, _) = metadata_times(path);
     Ok(SaveResult {
         ok: true,
         saved_at: chrono::Utc::now().to_rfc3339(),
+        updated_at,
     })
 }
 

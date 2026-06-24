@@ -1,5 +1,5 @@
 import { Check, ChevronDown, Search } from 'lucide-react'
-import { useEffect, useMemo, useState, type MouseEvent, type UIEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type UIEvent } from 'react'
 import { useEditorStore } from '../stores/editorStore'
 import { useFileListStore } from '../stores/fileListStore'
 import {
@@ -24,8 +24,12 @@ import { RecentlyDeletedPane } from './RecentlyDeletedPane'
 import { showToast } from './Toast'
 
 const sortLabels: Record<SortMode, string> = {
-  updatedAt: '最近修改',
-  name: '文件名',
+  'updatedAt-desc': '修改时间 ↓',
+  'updatedAt-asc': '修改时间 ↑',
+  'createdAt-desc': '创建时间 ↓',
+  'createdAt-asc': '创建时间 ↑',
+  'name-asc': '文件名 A-Z',
+  'name-desc': '文件名 Z-A',
   path: '路径',
 }
 
@@ -50,6 +54,7 @@ export function FlatFileListPane() {
   const deletedCount = useRecentlyDeletedStore((state) => state.recentlyDeletedFiles.length)
   const [sortOpen, setSortOpen] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; file: EditableFile } | null>(null)
+  const fileCardRefs = useRef(new Map<string, HTMLDivElement>())
 
   const selectedFolder = getFolderSelection(folders, activeFolderId)
   const isAllFiles = activeFolderId === 'all'
@@ -72,8 +77,12 @@ export function FlatFileListPane() {
           || previewText.includes(needle)
       })
       .sort((a, b) => {
-        if (sortMode === 'updatedAt') return (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')
+        if (sortMode === 'updatedAt-desc') return (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')
+        if (sortMode === 'updatedAt-asc') return (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')
+        if (sortMode === 'createdAt-desc') return (b.createdAt ?? '').localeCompare(a.createdAt ?? '')
+        if (sortMode === 'createdAt-asc') return (a.createdAt ?? '').localeCompare(b.createdAt ?? '')
         if (sortMode === 'path') return a.path.localeCompare(b.path, 'zh-CN')
+        if (sortMode === 'name-desc') return b.name.localeCompare(a.name, 'zh-CN')
         return a.name.localeCompare(b.name, 'zh-CN')
       })
   }, [activeFolderId, folders, getPreviewKey, isAllFiles, isRecentlyDeleted, previews, query, sortMode])
@@ -96,6 +105,17 @@ export function FlatFileListPane() {
     event.preventDefault()
     setMenu({ x: event.clientX, y: event.clientY, file })
   }
+
+  const activeFileIndex = files.findIndex((file) => file.id === activeFileId)
+
+  useEffect(() => {
+    if (!activeFileId) return
+    const target = fileCardRefs.current.get(activeFileId)
+    if (!target) return
+    window.requestAnimationFrame(() => {
+      target.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    })
+  }, [activeFileId, activeFileIndex, activeFolderId, query, sortMode])
 
   return (
     <div className="file-list-shell">
@@ -144,19 +164,26 @@ export function FlatFileListPane() {
             (() => {
               const preview = previews[getPreviewKey(file)]
               return (
-                <FileCard
+                <div
                   key={file.id}
-                  file={file}
-                  preview={preview?.preview}
-                  previewStatus={preview?.status}
-                  selected={activeFileId === file.id}
-                  showParentFolder={isAllFiles}
-                  onOpen={() => {
-                    if (!isAllFiles && file.rootFolderId) selectFolder(activeFolderId ?? file.rootFolderId)
-                    openFile(file.id)
+                  ref={(element) => {
+                    if (element) fileCardRefs.current.set(file.id, element)
+                    else fileCardRefs.current.delete(file.id)
                   }}
-                  onContextMenu={(event) => openMenu(event, file)}
-                />
+                >
+                  <FileCard
+                    file={file}
+                    preview={preview?.preview}
+                    previewStatus={preview?.status}
+                    selected={activeFileId === file.id}
+                    showParentFolder={isAllFiles}
+                    onOpen={() => {
+                      if (!isAllFiles && file.rootFolderId) selectFolder(activeFolderId ?? file.rootFolderId)
+                      openFile(file.id)
+                    }}
+                    onContextMenu={(event) => openMenu(event, file)}
+                  />
+                </div>
               )
             })()
           ))}

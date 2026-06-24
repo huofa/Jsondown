@@ -11,6 +11,8 @@ const IGNORED_NAMES: &[&str] = &[
     ".vite",
     "coverage",
     ".jsondown-trash",
+    ".obsidian",
+    ".smart-env",
 ];
 
 const VIEWABLE_EXTENSIONS: &[&str] = &[
@@ -28,11 +30,24 @@ pub fn should_ignore(path: &Path) -> bool {
         return true;
     };
 
+    if name.ends_with(".jsondown.tmp") {
+        return true;
+    }
+
     if IGNORED_NAMES.contains(&name) {
         return true;
     }
 
     name.starts_with('.') && name != "."
+}
+
+pub fn has_ignored_component(path: &Path) -> bool {
+    path.components().any(|component| {
+        let name = component.as_os_str().to_string_lossy();
+        name.ends_with(".jsondown.tmp")
+            || IGNORED_NAMES.contains(&name.as_ref())
+            || (name.starts_with('.') && name != "." && name != "..")
+    })
 }
 
 pub fn extension(path: &Path) -> Option<String> {
@@ -52,4 +67,3 @@ pub fn is_supported_text_file(path: &Path) -> bool {
         .map(|ext| TEXT_EXTENSIONS.contains(&ext.as_str()))
         .unwrap_or(false)
 }
-
