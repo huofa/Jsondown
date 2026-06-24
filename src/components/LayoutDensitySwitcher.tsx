@@ -45,7 +45,7 @@ export function LayoutDensitySwitcher() {
               />
             </label>
             <label>
-              上下间距 <span>{customEditorLayout.lineHeight.toFixed(2)}</span>
+              行高 <span>{customEditorLayout.lineHeight.toFixed(2)}</span>
               <input
                 type="range"
                 min="1.25"
@@ -53,6 +53,17 @@ export function LayoutDensitySwitcher() {
                 step="0.05"
                 value={customEditorLayout.lineHeight}
                 onChange={(event) => setCustomEditorLayout({ lineHeight: Number(event.target.value) })}
+              />
+            </label>
+            <label>
+              上下间距 <span>{customEditorLayout.paragraphSpacing}px</span>
+              <input
+                type="range"
+                min="-12"
+                max="36"
+                step="1"
+                value={customEditorLayout.paragraphSpacing}
+                onChange={(event) => setCustomEditorLayout({ paragraphSpacing: Number(event.target.value) })}
               />
             </label>
             <label>

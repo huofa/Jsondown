@@ -79,7 +79,8 @@ export default function App() {
       className={`app-frame density-${layoutDensity}`}
       style={{
         '--custom-editor-font-size': `${customEditorLayout.fontSize}px`,
-        '--custom-editor-line-height': customEditorLayout.lineHeight,
+        '--custom-editor-line-height': String(customEditorLayout.lineHeight),
+        '--custom-editor-paragraph-spacing': `${customEditorLayout.paragraphSpacing}px`,
         '--custom-editor-letter-spacing': `${customEditorLayout.letterSpacing}px`,
         '--custom-editor-horizontal-padding': `${customEditorLayout.horizontalPadding}px`,
       } as CSSProperties}
