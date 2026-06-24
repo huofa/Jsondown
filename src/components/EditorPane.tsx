@@ -17,6 +17,8 @@ import { TopEditorToolbar } from './TopEditorToolbar'
 import { LayoutDensitySwitcher } from './LayoutDensitySwitcher'
 import { SidebarCollapseButton } from './SidebarCollapseButton'
 
+const countLineBreaks = (value: string) => (value.match(/\n/g) ?? []).length
+
 export function EditorPane() {
   const folders = useRootFolderStore((state) => state.folders)
   const activeFolderId = useRootFolderStore((state) => state.activeFolderId)
@@ -67,9 +69,13 @@ export function EditorPane() {
     const scroll = editorScrollRef.current
     const beforeTop = scroll?.scrollTop ?? 0
     const beforeHeight = scroll?.scrollHeight ?? 0
+    const previousLineBreaks = countLineBreaks(content)
+    const nextLineBreaks = countLineBreaks(markdown)
+    const didAddKeyboardLine = nextLineBreaks > previousLineBreaks
     const isNearBottom = scroll
       ? beforeTop + scroll.clientHeight >= beforeHeight - 80
       : false
+    const shouldAllowNaturalScroll = didAddKeyboardLine && isNearBottom
 
     updateContent(id, markdown)
 
@@ -85,7 +91,7 @@ export function EditorPane() {
         current.scrollTop = 0
         return
       }
-      if (!isNearBottom) current.scrollTop = beforeTop
+      if (!shouldAllowNaturalScroll) current.scrollTop = beforeTop
     }
 
     window.requestAnimationFrame(() => {
