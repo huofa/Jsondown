@@ -7,7 +7,7 @@ import {
   MoreHorizontal,
   Upload,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { useMemo, useRef, useState, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { useEditorStore } from '../stores/editorStore'
 import { useFileTreeStore } from '../stores/fileTreeStore'
 import { useRootFolderStore } from '../stores/rootFolderStore'
@@ -75,30 +75,40 @@ export function RootFolderSidebar() {
     return null
   }
 
-  useEffect(() => {
-    if (!draggedId) return
+  const startRootFolderDrag = (event: ReactPointerEvent<HTMLElement>, folderId: string) => {
+    event.preventDefault()
+    event.stopPropagation()
+    draggedIdRef.current = folderId
+    setDraggedId(folderId)
+    setDropTarget(null)
 
-    const handlePointerMove = (event: PointerEvent) => {
-      const target = rootDropTargetAtPoint(event.clientX, event.clientY)
-      setDropTarget(target && target.id !== draggedIdRef.current ? target : null)
-    }
-
-    const handlePointerUp = (event: PointerEvent) => {
-      const sourceId = draggedIdRef.current
-      const target = rootDropTargetAtPoint(event.clientX, event.clientY)
-      if (sourceId && target && sourceId !== target.id) reorderFolders(sourceId, target.id, target.position)
-      clearDragState()
-    }
-
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', handlePointerUp, { once: true })
-    window.addEventListener('pointercancel', clearDragState, { once: true })
-    return () => {
+    const cleanup = () => {
       window.removeEventListener('pointermove', handlePointerMove)
       window.removeEventListener('pointerup', handlePointerUp)
-      window.removeEventListener('pointercancel', clearDragState)
+      window.removeEventListener('pointercancel', handlePointerCancel)
     }
-  }, [draggedId, reorderFolders])
+    const finish = () => {
+      cleanup()
+      clearDragState()
+    }
+    const handlePointerMove = (pointerEvent: PointerEvent) => {
+      pointerEvent.preventDefault()
+      const target = rootDropTargetAtPoint(pointerEvent.clientX, pointerEvent.clientY)
+      setDropTarget(target && target.id !== draggedIdRef.current ? target : null)
+    }
+    const handlePointerUp = (pointerEvent: PointerEvent) => {
+      pointerEvent.preventDefault()
+      const sourceId = draggedIdRef.current
+      const target = rootDropTargetAtPoint(pointerEvent.clientX, pointerEvent.clientY)
+      if (sourceId && target && sourceId !== target.id) reorderFolders(sourceId, target.id, target.position)
+      finish()
+    }
+    const handlePointerCancel = () => finish()
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: false })
+    window.addEventListener('pointerup', handlePointerUp, { once: true })
+    window.addEventListener('pointercancel', handlePointerCancel, { once: true })
+  }
 
   const openFolderMenu = (event: MouseEvent, folder: RootFolder) => {
     event.preventDefault()
@@ -125,12 +135,14 @@ export function RootFolderSidebar() {
       <div className="sidebar-scroll">
         <div
           className={`system-folder-row all-files-row ${activeFolderId === 'all' ? 'is-active' : ''}`}
+          onClick={() => selectFolder('all')}
         >
-          <button className="system-folder-main" onClick={() => selectFolder('all')}>
-            <span className="system-folder-chevron" />
+          <span className="system-folder-leading-spacer" />
+          <span className="system-folder-expand-spacer" />
+          <span className="system-folder-copy">
             <Folder size={15} fill="currentColor" />
-            <span className="system-folder-copy"><strong>全部文件</strong></span>
-          </button>
+            <strong>全部文件</strong>
+          </span>
           <button
             className="row-action"
             title="全部文件菜单"
@@ -173,10 +185,7 @@ export function RootFolderSidebar() {
                       event.stopPropagation()
                     }}
                     onPointerDown={(event: ReactPointerEvent<HTMLSpanElement>) => {
-                      event.preventDefault()
-                      event.stopPropagation()
-                      draggedIdRef.current = folder.id
-                      setDraggedId(folder.id)
+                      startRootFolderDrag(event, folder.id)
                     }}
                   >
                     <GripVertical size={13} />
