@@ -90,16 +90,24 @@
 .root-folder-list { padding: 0; }
 .root-folder-group { margin: 2px 0 7px; border-radius: 9px; }
 .root-folder-group.is-dragging { opacity: .45; }
-.root-folder-group.is-active > .root-folder-row { background: rgba(255,255,255,.72); }
 .root-folder-row {
   position: relative;
   display: grid;
   grid-template-columns: 16px 20px minmax(0, 1fr) 25px 4ch;
   align-items: center;
+  box-sizing: border-box;
+  width: 100%;
   min-height: 42px;
   padding: 3px 6px 3px 2px;
   border-radius: 8px;
   color: #625d56;
+  background: transparent;
+  overflow: hidden;
+}
+.root-folder-group.is-active > .root-folder-row {
+  color: #392f23;
+  background: rgba(255,255,255,.86);
+  box-shadow: 0 1px 2px rgba(48,42,34,.04);
 }
 .root-folder-group.is-drop-before > .root-folder-row::before,
 .root-folder-group.is-drop-after > .root-folder-row::after {
@@ -156,6 +164,11 @@
   background: transparent;
   cursor: pointer;
 }
+.root-folder-select:hover,
+.root-folder-select:focus {
+  background: transparent;
+  outline: 0;
+}
 .root-folder-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; text-align: left; }
 .root-folder-copy strong { overflow: hidden; color: #4b4640; font-size: 12.5px; font-weight: 620; text-overflow: ellipsis; white-space: nowrap; }
 .root-folder-copy small { overflow: hidden; color: #a19a91; font-size: 8.5px; font-weight: 450; text-overflow: ellipsis; white-space: nowrap; }
@@ -184,8 +197,27 @@
 .system-folder-row:hover .row-action,
 .tree-row-shell:hover .row-action { opacity: 1; }
 .row-action:hover { background: rgba(79,70,59,.08); }
-.root-folder-row > .row-action { grid-column: 4; }
-.root-folder-row > .sidebar-count { grid-column: 5; }
+.root-folder-row > .row-action {
+  grid-column: 4;
+  background: transparent;
+}
+.root-folder-row > .sidebar-count {
+  grid-column: 5;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  align-self: stretch;
+  width: 4ch;
+  margin: 0;
+  background: transparent;
+}
+.root-folder-row > .drag-handle,
+.root-folder-row > .root-expand,
+.root-folder-row > .root-folder-select,
+.root-folder-row > .root-folder-copy,
+.root-folder-row > .sidebar-count {
+  background: transparent;
+}
 
 .folder-tree { padding-bottom: 2px; }
 .root-folder-group > .folder-tree { margin: 0 2px 0 12px; padding: 2px 0 4px; border-left: 1px solid rgba(88,78,66,.09); }
