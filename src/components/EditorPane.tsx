@@ -17,8 +17,6 @@ import { TopEditorToolbar } from './TopEditorToolbar'
 import { LayoutDensitySwitcher } from './LayoutDensitySwitcher'
 import { SidebarCollapseButton } from './SidebarCollapseButton'
 
-const countLineBreaks = (value: string) => (value.match(/\n/g) ?? []).length
-
 export function EditorPane() {
   const folders = useRootFolderStore((state) => state.folders)
   const activeFolderId = useRootFolderStore((state) => state.activeFolderId)
@@ -69,35 +67,25 @@ export function EditorPane() {
     const scroll = editorScrollRef.current
     const beforeTop = scroll?.scrollTop ?? 0
     const beforeHeight = scroll?.scrollHeight ?? 0
-    const previousLineBreaks = countLineBreaks(content)
-    const nextLineBreaks = countLineBreaks(markdown)
-    const didAddKeyboardLine = nextLineBreaks > previousLineBreaks
-    const isNearBottom = scroll
-      ? beforeTop + scroll.clientHeight >= beforeHeight - 80
-      : false
-    const shouldAllowNaturalScroll = didAddKeyboardLine && isNearBottom
 
     updateContent(id, markdown)
 
     const restoreScroll = () => {
       const current = editorScrollRef.current
       if (!current) return
-      const contentFitsFirstScreen = current.scrollHeight <= current.clientHeight + 6
-      if (contentFitsFirstScreen) {
-        current.scrollTop = 0
-        return
+      const maxTop = Math.max(0, current.scrollHeight - current.clientHeight)
+      const addedHeight = Math.max(0, current.scrollHeight - beforeHeight)
+
+      // 只有在内容高度增长（按了 Enter 新建行）且用户原本位于底部时，才允许自然滚动跟随
+      if (addedHeight > 0 && beforeTop + current.clientHeight >= beforeHeight - 80) {
+        current.scrollTop = Math.min(maxTop, beforeTop + addedHeight)
+      } else {
+        // 否则始终精确恢复滚动位置，确保输入字符时画面不动
+        current.scrollTop = Math.min(beforeTop, maxTop)
       }
-      if (beforeTop <= 2) {
-        current.scrollTop = 0
-        return
-      }
-      if (!shouldAllowNaturalScroll) current.scrollTop = beforeTop
     }
 
-    window.requestAnimationFrame(() => {
-      restoreScroll()
-      window.setTimeout(restoreScroll, 0)
-    })
+    window.requestAnimationFrame(restoreScroll)
   }
 
   return (

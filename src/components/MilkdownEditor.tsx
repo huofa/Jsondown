@@ -1,5 +1,5 @@
 import { Crepe, CrepeFeature } from '@milkdown/crepe'
-import { commandsCtx, editorViewCtx } from '@milkdown/kit/core'
+import { commandsCtx, editorViewCtx, editorViewOptionsCtx } from '@milkdown/kit/core'
 import { redoCommand, undoCommand } from '@milkdown/kit/plugin/history'
 import {
   insertHrCommand,
@@ -50,6 +50,13 @@ export function MilkdownEditor({ value, onChange, onReady }: MilkdownEditorProps
         [CrepeFeature.BlockEdit]: false,
         [CrepeFeature.Placeholder]: false,
       },
+    })
+
+    crepe.editor.config((ctx) => {
+      ctx.update(editorViewOptionsCtx, (options) => ({
+        ...options,
+        handleScrollToSelection: () => true,
+      }))
     })
 
     crepe.on((listener) => {
