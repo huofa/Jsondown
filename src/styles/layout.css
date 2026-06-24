@@ -40,14 +40,14 @@
 .sidebar-header h1 { font-size: 17px; letter-spacing: -.02em; }
 .sidebar-actions { display: flex; gap: 1px; }
 .sidebar-scroll {
-  --sidebar-count-right: 6px;
+  --sidebar-count-right: 2px;
   --sidebar-count-width: 24px;
   --sidebar-action-width: 25px;
   --sidebar-action-gap: 6px;
   min-height: 0;
   flex: 1;
   overflow: auto;
-  padding: 0 7px 18px;
+  padding: 0 2px 18px;
 }
 
 .system-folder-row {
@@ -55,7 +55,7 @@
   box-sizing: border-box;
   width: 100%;
   display: grid;
-  grid-template-columns: 16px 20px minmax(0, 1fr);
+  grid-template-columns: 5px 20px minmax(0, 1fr);
   align-items: center;
   column-gap: 0;
   min-height: 42px;
@@ -70,7 +70,7 @@
 }
 .system-folder-leading-spacer {
   grid-column: 1;
-  width: 16px;
+  width: 5px;
   height: 26px;
 }
 .system-folder-expand-spacer {
@@ -155,7 +155,7 @@
 .root-folder-row {
   position: relative;
   display: grid;
-  grid-template-columns: 16px 20px minmax(0, 1fr);
+  grid-template-columns: 5px 20px minmax(0, 1fr);
   align-items: center;
   box-sizing: border-box;
   width: 100%;
@@ -186,21 +186,11 @@
 .root-folder-group.is-drop-before > .root-folder-row::before { top: -3px; }
 .root-folder-group.is-drop-after > .root-folder-row::after { bottom: -3px; }
 .root-folder-row:hover { background: rgba(255,255,255,.46); }
-.drag-handle {
-  display: grid;
-  place-items: center;
+.root-row-leading-spacer {
   grid-column: 1;
-  width: 16px;
+  width: 5px;
   height: 26px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  opacity: 0;
-  color: #9a9288;
-  cursor: grab;
 }
-.drag-handle:active { cursor: grabbing; }
-.root-folder-row:hover .drag-handle { opacity: .35; }
 .root-expand {
   display: grid;
   place-items: center;
@@ -292,6 +282,7 @@
   z-index: 1;
 }
 .root-folder-row > .drag-handle,
+.root-folder-row > .root-row-leading-spacer,
 .root-folder-row > .root-expand,
 .root-folder-row > .root-folder-select,
 .root-folder-row > .root-folder-copy,
@@ -320,7 +311,7 @@
   position: absolute;
   top: 2px;
   bottom: 4px;
-  left: 12px;
+  left: 5px;
   width: 1px;
   background: rgba(88,78,66,.09);
   pointer-events: none;

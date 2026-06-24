@@ -3,7 +3,6 @@ import {
   ChevronRight,
   Folder,
   FolderPlus,
-  GripVertical,
   MoreHorizontal,
   Upload,
 } from 'lucide-react'
@@ -46,6 +45,7 @@ export function RootFolderSidebar() {
   const toggleRootExpanded = useFileTreeStore((state) => state.toggleRootExpanded)
   const openFile = useEditorStore((state) => state.openFile)
   const draggedIdRef = useRef<string | null>(null)
+  const suppressNextRootClickRef = useRef(false)
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<{ id: string; position: 'before' | 'after' } | null>(null)
   const [newFolderOpen, setNewFolderOpen] = useState(false)
@@ -76,11 +76,13 @@ export function RootFolderSidebar() {
   }
 
   const startRootFolderDrag = (event: ReactPointerEvent<HTMLElement>, folderId: string) => {
-    event.preventDefault()
-    event.stopPropagation()
-    draggedIdRef.current = folderId
-    setDraggedId(folderId)
-    setDropTarget(null)
+    if (event.button !== 0) return
+    const target = event.target as HTMLElement | null
+    if (target?.closest('.row-action, .root-expand')) return
+
+    const startX = event.clientX
+    const startY = event.clientY
+    let didStartDrag = false
 
     const cleanup = () => {
       window.removeEventListener('pointermove', handlePointerMove)
@@ -92,16 +94,35 @@ export function RootFolderSidebar() {
       clearDragState()
     }
     const handlePointerMove = (pointerEvent: PointerEvent) => {
+      const movedX = Math.abs(pointerEvent.clientX - startX)
+      const movedY = Math.abs(pointerEvent.clientY - startY)
+      if (!didStartDrag && Math.max(movedX, movedY) < 5) return
+
+      if (!didStartDrag) {
+        didStartDrag = true
+        suppressNextRootClickRef.current = true
+        draggedIdRef.current = folderId
+        setDraggedId(folderId)
+        setDropTarget(null)
+      }
+
       pointerEvent.preventDefault()
       const target = rootDropTargetAtPoint(pointerEvent.clientX, pointerEvent.clientY)
       setDropTarget(target && target.id !== draggedIdRef.current ? target : null)
     }
     const handlePointerUp = (pointerEvent: PointerEvent) => {
+      if (!didStartDrag) {
+        cleanup()
+        return
+      }
       pointerEvent.preventDefault()
       const sourceId = draggedIdRef.current
       const target = rootDropTargetAtPoint(pointerEvent.clientX, pointerEvent.clientY)
       if (sourceId && target && sourceId !== target.id) reorderFolders(sourceId, target.id, target.position)
       finish()
+      window.setTimeout(() => {
+        suppressNextRootClickRef.current = false
+      }, 120)
     }
     const handlePointerCancel = () => finish()
 
@@ -173,23 +194,17 @@ export function RootFolderSidebar() {
                   dropTarget?.id === folder.id && dropTarget.position === 'after' ? 'is-drop-after' : '',
                 ].filter(Boolean).join(' ')}
               >
-                <div className="root-folder-row">
-                  <span
-                    className="drag-handle"
-                    role="button"
-                    tabIndex={0}
-                    title="拖动排序"
-                    aria-label={`拖动排序 ${folder.name}`}
-                    onClick={(event) => {
-                      event.preventDefault()
-                      event.stopPropagation()
-                    }}
-                    onPointerDown={(event: ReactPointerEvent<HTMLSpanElement>) => {
-                      startRootFolderDrag(event, folder.id)
-                    }}
-                  >
-                    <GripVertical size={13} />
-                  </span>
+                <div
+                  className="root-folder-row"
+                  onPointerDown={(event: ReactPointerEvent<HTMLDivElement>) => startRootFolderDrag(event, folder.id)}
+                  onClickCapture={(event) => {
+                    if (!suppressNextRootClickRef.current) return
+                    event.preventDefault()
+                    event.stopPropagation()
+                    suppressNextRootClickRef.current = false
+                  }}
+                >
+                  <span className="root-row-leading-spacer" aria-hidden="true" />
                   <button
                     className="root-expand"
                     onClick={() => toggleRootExpanded(folder.id)}
