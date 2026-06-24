@@ -89,30 +89,52 @@
 
 .root-folder-list { padding: 0; }
 .root-folder-group { margin: 2px 0 7px; border-radius: 9px; }
+.root-folder-group.is-dragging { opacity: .45; }
 .root-folder-group.is-active > .root-folder-row { background: rgba(255,255,255,.72); }
 .root-folder-row {
   position: relative;
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) 25px 4ch;
+  grid-template-columns: 16px 20px minmax(0, 1fr) 25px 4ch;
   align-items: center;
   min-height: 42px;
-  padding: 3px 6px 3px 4px;
+  padding: 3px 6px 3px 2px;
   border-radius: 8px;
   color: #625d56;
 }
+.root-folder-group.is-drop-before > .root-folder-row::before,
+.root-folder-group.is-drop-after > .root-folder-row::after {
+  content: "";
+  position: absolute;
+  left: 20px;
+  right: 10px;
+  height: 2px;
+  border-radius: 999px;
+  background: #bd8f4f;
+  box-shadow: 0 0 0 1px rgba(189,143,79,.18);
+  pointer-events: none;
+}
+.root-folder-group.is-drop-before > .root-folder-row::before { top: -3px; }
+.root-folder-group.is-drop-after > .root-folder-row::after { bottom: -3px; }
 .root-folder-row:hover { background: rgba(255,255,255,.46); }
 .drag-handle {
-  position: absolute;
-  left: -9px;
+  display: grid;
+  place-items: center;
+  grid-column: 1;
+  width: 16px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   opacity: 0;
   color: #9a9288;
   cursor: grab;
 }
+.drag-handle:active { cursor: grabbing; }
 .root-folder-row:hover .drag-handle { opacity: .35; }
 .root-expand {
   display: grid;
   place-items: center;
-  grid-column: 1;
+  grid-column: 2;
   width: 20px;
   height: 26px;
   padding: 0;
@@ -123,7 +145,7 @@
 }
 .root-folder-select {
   min-width: 0;
-  grid-column: 2;
+  grid-column: 3;
   flex: 1;
   display: flex;
   align-items: center;
@@ -162,6 +184,8 @@
 .system-folder-row:hover .row-action,
 .tree-row-shell:hover .row-action { opacity: 1; }
 .row-action:hover { background: rgba(79,70,59,.08); }
+.root-folder-row > .row-action { grid-column: 4; }
+.root-folder-row > .sidebar-count { grid-column: 5; }
 
 .folder-tree { padding-bottom: 2px; }
 .root-folder-group > .folder-tree { margin: 0 2px 0 12px; padding: 2px 0 4px; border-left: 1px solid rgba(88,78,66,.09); }

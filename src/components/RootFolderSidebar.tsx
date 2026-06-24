@@ -7,7 +7,7 @@ import {
   MoreHorizontal,
   Upload,
 } from 'lucide-react'
-import { useMemo, useState, type DragEvent, type MouseEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { useEditorStore } from '../stores/editorStore'
 import { useFileTreeStore } from '../stores/fileTreeStore'
 import { useRootFolderStore } from '../stores/rootFolderStore'
@@ -45,7 +45,9 @@ export function RootFolderSidebar() {
   const expandedRootIds = useFileTreeStore((state) => state.expandedRootIds)
   const toggleRootExpanded = useFileTreeStore((state) => state.toggleRootExpanded)
   const openFile = useEditorStore((state) => state.openFile)
+  const draggedIdRef = useRef<string | null>(null)
   const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [dropTarget, setDropTarget] = useState<{ id: string; position: 'before' | 'after' } | null>(null)
   const [newFolderOpen, setNewFolderOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; folder: RootFolder } | null>(null)
@@ -54,11 +56,49 @@ export function RootFolderSidebar() {
   const importTarget = ordered.find((folder) => folder.id === activeFolderId) ?? ordered[0]
   const allFilesCount = ordered.reduce((sum, folder) => sum + flattenFiles(folder.tree ?? [], folder.path).length, 0)
 
-  const dropOn = (event: DragEvent, targetId: string) => {
-    event.preventDefault()
-    if (draggedId) reorderFolders(draggedId, targetId)
+  const clearDragState = () => {
+    draggedIdRef.current = null
     setDraggedId(null)
+    setDropTarget(null)
   }
+
+  const rootDropTargetAtPoint = (x: number, y: number): { id: string; position: 'before' | 'after' } | null => {
+    for (const item of document.elementsFromPoint(x, y)) {
+      if (!(item instanceof HTMLElement)) continue
+      const root = item.closest<HTMLElement>('[data-root-folder-id]')
+      if (!root?.dataset.rootFolderId) continue
+      const row = root.querySelector<HTMLElement>('.root-folder-row')
+      const rect = (row ?? root).getBoundingClientRect()
+      const position = y > rect.top + rect.height / 2 ? 'after' : 'before'
+      return { id: root.dataset.rootFolderId, position }
+    }
+    return null
+  }
+
+  useEffect(() => {
+    if (!draggedId) return
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const target = rootDropTargetAtPoint(event.clientX, event.clientY)
+      setDropTarget(target && target.id !== draggedIdRef.current ? target : null)
+    }
+
+    const handlePointerUp = (event: PointerEvent) => {
+      const sourceId = draggedIdRef.current
+      const target = rootDropTargetAtPoint(event.clientX, event.clientY)
+      if (sourceId && target && sourceId !== target.id) reorderFolders(sourceId, target.id, target.position)
+      clearDragState()
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp, { once: true })
+    window.addEventListener('pointercancel', clearDragState, { once: true })
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', clearDragState)
+    }
+  }, [draggedId, reorderFolders])
 
   const openFolderMenu = (event: MouseEvent, folder: RootFolder) => {
     event.preventDefault()
@@ -111,14 +151,36 @@ export function RootFolderSidebar() {
             return (
               <section
                 key={folder.id}
-                className={`root-folder-group ${folder.id === activeFolderId ? 'is-active' : ''}`}
-                draggable
-                onDragStart={() => setDraggedId(folder.id)}
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => dropOn(event, folder.id)}
+                data-root-folder-id={folder.id}
+                className={[
+                  'root-folder-group',
+                  folder.id === activeFolderId ? 'is-active' : '',
+                  draggedId === folder.id ? 'is-dragging' : '',
+                  dropTarget?.id === folder.id ? 'is-drop-over' : '',
+                  dropTarget?.id === folder.id && dropTarget.position === 'before' ? 'is-drop-before' : '',
+                  dropTarget?.id === folder.id && dropTarget.position === 'after' ? 'is-drop-after' : '',
+                ].filter(Boolean).join(' ')}
               >
                 <div className="root-folder-row">
-                  <GripVertical className="drag-handle" size={13} />
+                  <span
+                    className="drag-handle"
+                    role="button"
+                    tabIndex={0}
+                    title="拖动排序"
+                    aria-label={`拖动排序 ${folder.name}`}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                    }}
+                    onPointerDown={(event: ReactPointerEvent<HTMLSpanElement>) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      draggedIdRef.current = folder.id
+                      setDraggedId(folder.id)
+                    }}
+                  >
+                    <GripVertical size={13} />
+                  </span>
                   <button
                     className="root-expand"
                     onClick={() => toggleRootExpanded(folder.id)}

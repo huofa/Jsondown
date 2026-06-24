@@ -36,7 +36,7 @@ type RootFolderState = {
   removeTreeNode: (id: string) => void
   restoreFile: (rootFolderId: string, parentId: string | undefined, node: FileTreeNode) => void
   selectFolder: (id: string) => void
-  reorderFolders: (sourceId: string, targetId: string) => void
+  reorderFolders: (sourceId: string, targetId: string, position?: 'before' | 'after') => void
 }
 
 const uniqueId = (prefix: string) => `${prefix}-${Date.now()}-${Math.round(Math.random() * 1000)}`
@@ -375,14 +375,16 @@ export const useRootFolderStore = create<RootFolderState>((set, get) => ({
       }
     }),
   selectFolder: (id) => set({ activeFolderId: id }),
-  reorderFolders: (sourceId, targetId) =>
+  reorderFolders: (sourceId, targetId, position = 'before') =>
     set((state) => {
       const folders = [...state.folders].sort((a, b) => a.order - b.order)
       const from = folders.findIndex((folder) => folder.id === sourceId)
-      const to = folders.findIndex((folder) => folder.id === targetId)
-      if (from < 0 || to < 0 || from === to) return state
+      if (from < 0) return state
       const [moved] = folders.splice(from, 1)
-      folders.splice(to, 0, moved)
+      const to = folders.findIndex((folder) => folder.id === targetId)
+      if (to < 0) return state
+      const insertAt = position === 'after' ? to + 1 : to
+      folders.splice(insertAt, 0, moved)
       const ordered = folders.map((folder, order) => ({ ...folder, order }))
       saveFolders(ordered, state.activeFolderId)
       return { folders: ordered }
