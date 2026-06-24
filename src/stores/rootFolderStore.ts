@@ -31,7 +31,7 @@ type RootFolderState = {
   removeFolder: (id: string) => void
   renameFolder: (id: string, name: string) => void
   renameTreeFolder: (id: string, name: string) => Promise<void>
-  renameFile: (id: string, name: string) => Promise<void>
+  renameFile: (id: string, name: string) => Promise<string | null>
   removeFile: (id: string) => void
   removeTreeNode: (id: string) => void
   restoreFile: (rootFolderId: string, parentId: string | undefined, node: FileTreeNode) => void
@@ -46,6 +46,14 @@ const extensionFor = (name: string) => normalizeExtension(name || '未命名.md'
 const fileNameFor = (name?: string) => {
   const trimmed = name?.trim() || '新建笔记'
   return trimmed.includes('.') ? trimmed : `${trimmed}.md`
+}
+
+const renameFileNameFor = (currentName: string, nextName: string) => {
+  const trimmed = nextName.trim()
+  if (!trimmed) return currentName
+  if (trimmed.includes('.')) return trimmed
+  const currentExtension = currentName.includes('.') ? currentName.slice(currentName.lastIndexOf('.')) : ''
+  return `${trimmed}${currentExtension}`
 }
 
 const updateChildPaths = (node: FileTreeNode): FileTreeNode => ({
@@ -311,23 +319,25 @@ export const useRootFolderStore = create<RootFolderState>((set, get) => ({
   renameFile: async (id, name) => {
     const root = findRootForSelection(get().folders, id)
     const node = root ? findNodeById(root.tree ?? [], id) : null
-    if (!root || !node) return
+    if (!root || !node) return null
+    const nextName = renameFileNameFor(node.name, name)
     if (isTauriRuntime()) {
-      await renamePath(node.path, name)
+      const nextPath = await renamePath(node.path, nextName)
       await get().refreshRootFolder(root.id)
-      return
+      return nextPath
     }
     set((state) => {
       const renameNodes = (nodes: FileTreeNode[]): FileTreeNode[] =>
         nodes.map((node) => {
           if (node.id === id) {
             const parent = node.path.slice(0, node.path.lastIndexOf('/'))
-            return { ...node, name, path: `${parent}/${name}` }
+            return { ...node, name: nextName, path: `${parent}/${nextName}` }
           }
           return node.children ? { ...node, children: renameNodes(node.children) } : node
         })
       return { folders: state.folders.map((folder) => ({ ...folder, tree: renameNodes(folder.tree ?? []) })) }
     })
+    return `${node.path.slice(0, node.path.lastIndexOf('/'))}/${nextName}`
   },
   removeFile: (id) =>
     set((state) => ({
@@ -378,4 +388,3 @@ export const useRootFolderStore = create<RootFolderState>((set, get) => ({
       return { folders: ordered }
     }),
 }))
-

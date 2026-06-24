@@ -53,6 +53,11 @@ export async function selectRootFolder(): Promise<RootFolder | null> {
   return invoke<RootFolder | null>('select_root_folder')
 }
 
+export async function selectParentFolder(): Promise<string | null> {
+  if (!isTauriRuntime()) return '~/Desktop'
+  return invoke<string | null>('select_parent_folder')
+}
+
 export async function createRootFolder(parentPath: string, folderName: string): Promise<RootFolder> {
   if (!isTauriRuntime()) return createMockFolder(Date.now(), folderName)
   return invoke<RootFolder>('create_root_folder', { parentPath, folderName })

@@ -11,7 +11,12 @@ import { useMemo, useState, type DragEvent, type MouseEvent } from 'react'
 import { useEditorStore } from '../stores/editorStore'
 import { useFileTreeStore } from '../stores/fileTreeStore'
 import { useRootFolderStore } from '../stores/rootFolderStore'
-import { createRootFolder, isTauriRuntime, revealInFinder } from '../services/tauriFileService'
+import {
+  createRootFolder,
+  isTauriRuntime,
+  revealInFinder,
+  selectParentFolder,
+} from '../services/tauriFileService'
 import type { RootFolder } from '../types/rootFolder'
 import { flattenFiles } from '../utils/flattenFiles'
 import { compactPath } from '../utils/formatDisplayTime'
@@ -34,7 +39,6 @@ export function RootFolderSidebar() {
     createMockSubfolder,
     importMockFile,
     removeFolder,
-    renameFolder,
     selectFolder,
     reorderFolders,
   } = useRootFolderStore()
@@ -67,7 +71,6 @@ export function RootFolderSidebar() {
       <header className="sidebar-header">
         <div>
           <span className="eyebrow">JSONDOWN</span>
-          <h1>资料夹</h1>
         </div>
         <div className="sidebar-actions">
           <button className="icon-button" onClick={() => setNewFolderOpen(true)} title="新建资料夹">
@@ -152,10 +155,11 @@ export function RootFolderSidebar() {
       <NewFolderDialog
         open={newFolderOpen}
         onClose={() => setNewFolderOpen(false)}
+        locationHint={isTauriRuntime() ? '系统文件夹选择器' : '桌面 / Desktop（Mock）'}
         onCreate={(name) => {
           void (async () => {
             if (isTauriRuntime()) {
-              const parentPath = window.prompt('请输入父文件夹路径（Tauri 后续可替换为选择位置对话框）')
+              const parentPath = await selectParentFolder()
               if (!parentPath) return
               const folder = await createRootFolder(parentPath, name)
               await addRootFolder(folder)
@@ -196,12 +200,6 @@ export function RootFolderSidebar() {
               .catch(() => showToast(`阶段 A Mock：在访达中打开 ${menu.folder.path}`))
               .finally(() => setMenu(null))
           }}
-          onRename={() => {
-            const name = window.prompt('重命名入口', menu.folder.name)
-            if (name) renameFolder(menu.folder.id, name)
-            setMenu(null)
-          }}
-          renameLabel="重命名入口名"
           onNewFolder={() => {
             const name = window.prompt('新建文件夹名称', '新建文件夹')
             void createMockSubfolder(menu.folder.id, name ?? undefined)

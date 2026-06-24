@@ -6,7 +6,10 @@ use commands::{
     config::{load_app_config, save_app_config},
     files::{create_file, read_file_preview, read_text_file, rename_path, write_text_file},
     finder::reveal_in_finder,
-    folders::{create_child_folder, create_root_folder, read_directory_tree, select_root_folder},
+    folders::{
+        create_child_folder, create_root_folder, read_directory_tree, select_parent_folder,
+        select_root_folder,
+    },
     trash::{
         list_recently_deleted, move_to_recently_deleted, permanently_delete_trash_item,
         restore_deleted_file,
@@ -19,6 +22,7 @@ pub fn run() {
         .manage(WatcherState::default())
         .invoke_handler(tauri::generate_handler![
             select_root_folder,
+            select_parent_folder,
             create_root_folder,
             read_directory_tree,
             read_file_preview,

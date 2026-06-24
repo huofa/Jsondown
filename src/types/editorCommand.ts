@@ -19,4 +19,5 @@ export type EditorCommand =
 export type EditorCommandApi = {
   run: (command: EditorCommand, payload?: string) => boolean
   heading: (level: number) => boolean
+  applyColor: (textColor: string, backgroundColor: string) => boolean
 }

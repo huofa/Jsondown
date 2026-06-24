@@ -8,7 +8,7 @@ import {
   RefreshCw,
   Trash2,
 } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 type ContextMenuProps = {
@@ -43,6 +43,17 @@ export function ContextMenu({
   deleteLabel = '删除入口',
 }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const [position, setPosition] = useState({ x, y })
+
+  useLayoutEffect(() => {
+    const element = ref.current
+    if (!element) return
+    const padding = 8
+    const rect = element.getBoundingClientRect()
+    const nextX = Math.max(padding, Math.min(x, window.innerWidth - rect.width - padding))
+    const nextY = Math.max(padding, Math.min(y, window.innerHeight - rect.height - padding))
+    setPosition({ x: nextX, y: nextY })
+  }, [x, y, onOpenInFinder, onCopyPath, onRename, onNewFolder, onNewFile, onImportFolder, onRefresh, onDelete])
 
   useEffect(() => {
     const close = (event: MouseEvent) => {
@@ -57,7 +68,7 @@ export function ContextMenu({
   }, [onClose])
 
   return createPortal(
-    <div ref={ref} className="context-menu" style={{ left: x, top: y }}>
+    <div ref={ref} className="context-menu" style={{ left: position.x, top: position.y }}>
       {onOpenInFinder && <button onClick={onOpenInFinder}><ExternalLink size={14} />在访达中打开</button>}
       {onCopyPath && <button onClick={onCopyPath}><Clipboard size={14} />复制路径</button>}
       {onRename && <button onClick={onRename}><Pencil size={14} />{renameLabel}</button>}

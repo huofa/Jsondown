@@ -89,19 +89,29 @@ export function MilkdownEditor({ value, onChange, onReady }: MilkdownEditorProps
         return result
       })
 
+    const applyColor = (textColor: string, backgroundColor: string) =>
+      crepe.editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx)
+        view.focus()
+        document.execCommand('foreColor', false, textColor)
+        document.execCommand('hiliteColor', false, backgroundColor)
+        return true
+      })
+
     const createPromise = crepe.create()
     void createPromise.then(() => {
       if (disposed) return
       onReadyRef.current?.({
         run,
-        heading: (level) =>
-          crepe.editor.action((ctx) => {
-            const result = level === 0
-              ? ctx.get(commandsCtx).call(turnIntoTextCommand.key)
-              : ctx.get(commandsCtx).call(wrapInHeadingCommand.key, level)
-            ctx.get(editorViewCtx).focus()
-            return result
-          }),
+          heading: (level) =>
+            crepe.editor.action((ctx) => {
+              const result = level === 0
+                ? ctx.get(commandsCtx).call(turnIntoTextCommand.key)
+                : ctx.get(commandsCtx).call(wrapInHeadingCommand.key, level)
+              ctx.get(editorViewCtx).focus()
+              return result
+            }),
+          applyColor,
       })
     })
 

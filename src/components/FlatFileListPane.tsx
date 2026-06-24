@@ -55,6 +55,7 @@ export function FlatFileListPane() {
   const [sortOpen, setSortOpen] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; file: EditableFile } | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const sortRef = useRef<HTMLDivElement>(null)
   const fileCardRefs = useRef(new Map<string, HTMLDivElement>())
 
   const selectedFolder = getFolderSelection(folders, activeFolderId)
@@ -92,6 +93,27 @@ export function FlatFileListPane() {
     if (isRecentlyDeleted) return
     ensurePreviews(files, 0, FIRST_PREVIEW_COUNT)
   }, [ensurePreviews, files, isRecentlyDeleted])
+
+  useEffect(() => {
+    setQuery('')
+    setSortOpen(false)
+    setMenu(null)
+    if (listRef.current) listRef.current.scrollTop = 0
+  }, [activeFolderId, setQuery])
+
+  useEffect(() => {
+    if (!sortOpen) return
+    const closeSort = (event: globalThis.MouseEvent) => {
+      if (!sortRef.current?.contains(event.target as Node)) setSortOpen(false)
+    }
+    const closeOnBlur = () => setSortOpen(false)
+    window.addEventListener('mousedown', closeSort)
+    window.addEventListener('blur', closeOnBlur)
+    return () => {
+      window.removeEventListener('mousedown', closeSort)
+      window.removeEventListener('blur', closeOnBlur)
+    }
+  }, [sortOpen])
 
   const handleListScroll = (event: UIEvent<HTMLDivElement>) => {
     const target = event.currentTarget
@@ -145,7 +167,7 @@ export function FlatFileListPane() {
               placeholder={isAllFiles ? '搜索文件名或已加载摘要' : `搜索“${title}”或已加载摘要`}
             />
           </label>
-          <div className="sort-control">
+          <div className="sort-control" ref={sortRef}>
             <button onClick={() => setSortOpen((open) => !open)}>
               {sortLabels[sortMode]}<ChevronDown size={12} />
             </button>
@@ -216,7 +238,10 @@ export function FlatFileListPane() {
           onRename={() => {
             const name = window.prompt('重命名文件', menu.file.name)
             if (name) {
-              void renameFile(menu.file.id, name).then(() => showToast('已重命名文件'))
+              void renameFile(menu.file.id, name).then((nextId) => {
+                if (nextId && activeFileId === menu.file.id) openFile(nextId)
+                showToast('已重命名文件')
+              })
             }
             setMenu(null)
           }}

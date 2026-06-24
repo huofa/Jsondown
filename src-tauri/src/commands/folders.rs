@@ -77,6 +77,13 @@ pub fn select_root_folder() -> Result<Option<RootFolderPayload>, String> {
 }
 
 #[tauri::command]
+pub fn select_parent_folder() -> Result<Option<String>, String> {
+    Ok(rfd::FileDialog::new()
+        .pick_folder()
+        .map(|path| path_to_string(&path)))
+}
+
+#[tauri::command]
 pub fn create_root_folder(parent_path: String, folder_name: String) -> Result<RootFolderPayload, String> {
     let name = folder_name.trim();
     if name.is_empty() {
@@ -119,4 +126,3 @@ pub fn create_child_folder(parent_path: String, folder_name: String) -> Result<F
         size,
     })
 }
-

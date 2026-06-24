@@ -5,9 +5,17 @@ type NewFolderDialogProps = {
   open: boolean
   onClose: () => void
   onCreate: (name: string) => void
+  description?: string
+  locationHint?: string
 }
 
-export function NewFolderDialog({ open, onClose, onCreate }: NewFolderDialogProps) {
+export function NewFolderDialog({
+  open,
+  onClose,
+  onCreate,
+  description = '选择一个本地位置后创建新资料夹。',
+  locationHint = '点击创建后选择位置',
+}: NewFolderDialogProps) {
   const [name, setName] = useState('新建资料夹')
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -28,12 +36,12 @@ export function NewFolderDialog({ open, onClose, onCreate }: NewFolderDialogProp
         }}
       >
         <h3>新建资料夹</h3>
-        <p>阶段 A 将模拟在桌面创建资料夹。</p>
+        <p>{description}</p>
         <label>
           名称
           <input ref={inputRef} value={name} onChange={(event) => setName(event.target.value)} />
         </label>
-        <div className="mock-location">位置　桌面 / Desktop</div>
+        <div className="mock-location">位置　{locationHint}</div>
         <div className="dialog-actions">
           <button type="button" onClick={onClose}>取消</button>
           <button type="submit" className="primary">创建</button>

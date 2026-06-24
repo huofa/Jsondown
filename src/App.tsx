@@ -75,9 +75,6 @@ export default function App() {
 
   return (
     <div className={`app-frame density-${layoutDensity}`}>
-      <div className="window-drag-strip" aria-hidden="true">
-        <span /><span /><span />
-      </div>
       <ResizablePanels
         left={<RootFolderSidebar />}
         middle={<FlatFileListPane />}

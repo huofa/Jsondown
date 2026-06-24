@@ -31,6 +31,31 @@
 .top-editor-toolbar button:active:not(:disabled) { background: rgba(68,60,51,.11); }
 .top-editor-toolbar button:disabled { color: #b9b4ad; cursor: default; }
 .toolbar-separator { flex: 0 0 1px; width: 1px; height: 16px; margin: 0 2px; background: rgba(75,67,57,.1); }
+.color-control { position: relative; display: grid; place-items: center; }
+.color-menu {
+  position: absolute;
+  z-index: 60;
+  top: 28px;
+  left: 0;
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid rgba(75,64,51,.13);
+  border-radius: 10px;
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 12px 30px rgba(55,47,39,.16);
+  backdrop-filter: blur(12px);
+}
+.top-editor-toolbar .color-menu button {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+}
+.top-editor-toolbar .color-menu button:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1px rgba(45,38,30,.18);
+}
 .heading-select {
   flex: 0 0 auto;
   width: 54px;
