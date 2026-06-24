@@ -35,6 +35,10 @@ npm run build:web
 - Tauri 2 桌面壳已接入。
 - 支持选择真实本地文件夹作为 RootFolder 入口。
 - 支持读取真实目录树，并过滤 `.git`、`node_modules`、`dist`、`build`、`.DS_Store`、`target`、`.next`、`.vite`、`coverage`、`.jsondown-trash` 等目录或文件。
+- 目录树扫描只读取 metadata：文件名、路径、类型、大小、真实创建时间和真实修改时间，不读取正文。
+- 中栏文件卡片使用异步 preview：默认只读取文件开头 4096 bytes，并提取前两行有效内容。
+- 中栏 preview 首次加载前 20 个文件，滚动一屏后提前预加载下一屏；并发限制为 3，避免一次性读取大量文件。
+- 搜索只匹配文件名、相对路径和已加载 preview，不触发全文读取。
 - 支持真实读取文本文件。
 - 支持 Markdown 自动保存写回原文件。
 - 支持真实新建文件、次级文件夹、重命名文件或次级文件夹。
@@ -60,6 +64,7 @@ npm run build:web
 - `select_root_folder`
 - `create_root_folder`
 - `read_directory_tree`
+- `read_file_preview`
 - `read_text_file`
 - `write_text_file`
 - `reveal_in_finder`
@@ -81,4 +86,3 @@ npm run build:web
 - 图片预览在 Tauri 下可以继续升级为 `convertFileSrc` 或自定义 asset protocol。
 - 文件监听是基础版，复杂 rename / 批量变更边界后续继续增强。
 - JSON block、HTML inline preview、纸张主题精修、MD 快捷菜单和包体积优化不在 V1.0 范围内。
-

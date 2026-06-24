@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::models::deleted_file::{DeletedFile, DeletedKind, TrashIndex};
 use crate::utils::ignore_rules::extension;
-use crate::utils::path_utils::{file_name, path_to_string};
+use crate::utils::path_utils::{file_name, metadata_times, path_to_string};
 
 pub fn trash_dir(root_path: &Path) -> PathBuf {
     root_path.join(".jsondown-trash")
@@ -46,6 +46,7 @@ pub fn make_trash_record(original_path: &Path, root_path: &Path) -> Result<Delet
     } else {
         DeletedKind::File
     };
+    let (original_created_at, original_updated_at, _) = metadata_times(original_path);
 
     Ok(DeletedFile {
         id,
@@ -54,7 +55,8 @@ pub fn make_trash_record(original_path: &Path, root_path: &Path) -> Result<Delet
         original_path: path_to_string(original_path),
         trash_path: path_to_string(&trash_path),
         deleted_at: Utc::now().to_rfc3339(),
+        original_created_at,
+        original_updated_at,
         extension: extension(original_path),
     })
 }
-

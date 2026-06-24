@@ -1,7 +1,8 @@
 import { Folder } from 'lucide-react'
 import type { MouseEvent } from 'react'
+import type { FilePreviewPayload } from '../services/tauriFileService'
+import type { FilePreviewStatus } from '../stores/filePreviewStore'
 import type { EditableFile } from '../types/file'
-import { extractMarkdownSummary } from '../utils/extractMarkdownSummary'
 
 const relativeTime = (iso?: string) => {
   if (!iso) return '刚刚'
@@ -17,7 +18,8 @@ const relativeTime = (iso?: string) => {
 
 type FileCardProps = {
   file: EditableFile
-  content: string
+  preview?: FilePreviewPayload
+  previewStatus?: FilePreviewStatus
   selected: boolean
   showParentFolder?: boolean
   onOpen: () => void
@@ -26,16 +28,21 @@ type FileCardProps = {
 
 export function FileCard({
   file,
-  content,
+  preview,
+  previewStatus = 'idle',
   selected,
   showParentFolder,
   onOpen,
   onContextMenu,
 }: FileCardProps) {
-  const title = file.name.replace(/\.(md|markdown)$/i, '')
+  const title = preview?.title || file.name.replace(/\.(md|markdown)$/i, '')
   const summary = file.kind === 'image'
     ? '图片文件'
-    : extractMarkdownSummary(content, '暂无内容')
+    : previewStatus === 'loading'
+      ? '加载中…'
+      : previewStatus === 'error'
+        ? '暂无预览'
+        : preview?.summary || '暂无预览'
   return (
     <button
       className={`file-card ${selected ? 'is-active' : ''}`}
@@ -47,7 +54,7 @@ export function FileCard({
       <span className="file-card-title">{title}</span>
       <span className="file-card-summary">{summary}</span>
       <span className="file-card-footer">
-        <time>{relativeTime(file.updatedAt)}</time>
+        <time>{relativeTime(file.updatedAt ?? file.createdAt)}</time>
         <span className="file-type">{file.extension.toUpperCase()}</span>
         <span className={file.editable ? 'editable' : ''}>{file.editable ? '可编辑' : '只读'}</span>
       </span>

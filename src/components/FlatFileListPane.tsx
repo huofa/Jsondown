@@ -1,7 +1,13 @@
 import { Check, ChevronDown, Search } from 'lucide-react'
-import { useMemo, useState, type MouseEvent } from 'react'
+import { useEffect, useMemo, useState, type MouseEvent, type UIEvent } from 'react'
 import { useEditorStore } from '../stores/editorStore'
 import { useFileListStore } from '../stores/fileListStore'
+import {
+  FIRST_PREVIEW_COUNT,
+  PAGE_SIZE,
+  PRELOAD_NEXT_PAGE_COUNT,
+  useFilePreviewStore,
+} from '../stores/filePreviewStore'
 import { useRecentlyDeletedStore } from '../stores/recentlyDeletedStore'
 import { useRootFolderStore } from '../stores/rootFolderStore'
 import {
@@ -32,10 +38,13 @@ export function FlatFileListPane() {
   const selectFolder = useRootFolderStore((state) => state.selectFolder)
   const { query, sortMode, setQuery, setSortMode } = useFileListStore()
   const activeFileId = useEditorStore((state) => state.activeFileId)
-  const contents = useEditorStore((state) => state.contents)
   const openFile = useEditorStore((state) => state.openFile)
   const removeContent = useEditorStore((state) => state.removeContent)
   const closeFile = useEditorStore((state) => state.closeFile)
+  const previews = useFilePreviewStore((state) => state.previews)
+  const ensurePreviews = useFilePreviewStore((state) => state.ensurePreviews)
+  const getPreviewKey = useFilePreviewStore((state) => state.getPreviewKey)
+  const removePreview = useFilePreviewStore((state) => state.removePreview)
   const loadRecentlyDeleted = useRecentlyDeletedStore((state) => state.loadRecentlyDeleted)
   const moveToRecentlyDeleted = useRecentlyDeletedStore((state) => state.moveToRecentlyDeleted)
   const deletedCount = useRecentlyDeletedStore((state) => state.recentlyDeletedFiles.length)
@@ -55,18 +64,33 @@ export function FlatFileListPane() {
     const needle = query.trim().toLocaleLowerCase()
     return source
       .filter((file) => {
-        const content = contents[file.id] ?? ''
+        const preview = previews[getPreviewKey(file)]?.preview
+        const previewText = `${preview?.title ?? ''} ${preview?.summary ?? ''}`.toLocaleLowerCase()
         return !needle
           || file.name.toLocaleLowerCase().includes(needle)
           || file.relativePath.toLocaleLowerCase().includes(needle)
-          || content.toLocaleLowerCase().includes(needle)
+          || previewText.includes(needle)
       })
       .sort((a, b) => {
         if (sortMode === 'updatedAt') return (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')
         if (sortMode === 'path') return a.path.localeCompare(b.path, 'zh-CN')
         return a.name.localeCompare(b.name, 'zh-CN')
       })
-  }, [activeFolderId, contents, folders, isAllFiles, isRecentlyDeleted, query, sortMode])
+  }, [activeFolderId, folders, getPreviewKey, isAllFiles, isRecentlyDeleted, previews, query, sortMode])
+
+  useEffect(() => {
+    if (isRecentlyDeleted) return
+    ensurePreviews(files, 0, FIRST_PREVIEW_COUNT)
+  }, [ensurePreviews, files, isRecentlyDeleted])
+
+  const handleListScroll = (event: UIEvent<HTMLDivElement>) => {
+    const target = event.currentTarget
+    const pageHeight = Math.max(target.clientHeight, 1)
+    const screen = Math.floor(target.scrollTop / pageHeight)
+    if (screen < 1) return
+    const start = FIRST_PREVIEW_COUNT + ((screen - 1) * PAGE_SIZE)
+    ensurePreviews(files, start, PRELOAD_NEXT_PAGE_COUNT)
+  }
 
   const openMenu = (event: MouseEvent, file: EditableFile) => {
     event.preventDefault()
@@ -92,7 +116,7 @@ export function FlatFileListPane() {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder={isAllFiles ? '搜索所有文件名或内容' : `搜索“${title}”`}
+              placeholder={isAllFiles ? '搜索文件名或已加载摘要' : `搜索“${title}”或已加载摘要`}
             />
           </label>
           <div className="sort-control">
@@ -115,20 +139,26 @@ export function FlatFileListPane() {
       {isRecentlyDeleted ? (
         <RecentlyDeletedPane />
       ) : (
-        <div className="file-list" role="listbox">
+        <div className="file-list" role="listbox" onScroll={handleListScroll}>
           {files.map((file) => (
-            <FileCard
-              key={file.id}
-              file={file}
-              content={contents[file.id] ?? ''}
-              selected={activeFileId === file.id}
-              showParentFolder={isAllFiles}
-              onOpen={() => {
-                if (!isAllFiles && file.rootFolderId) selectFolder(activeFolderId ?? file.rootFolderId)
-                openFile(file.id)
-              }}
-              onContextMenu={(event) => openMenu(event, file)}
-            />
+            (() => {
+              const preview = previews[getPreviewKey(file)]
+              return (
+                <FileCard
+                  key={file.id}
+                  file={file}
+                  preview={preview?.preview}
+                  previewStatus={preview?.status}
+                  selected={activeFileId === file.id}
+                  showParentFolder={isAllFiles}
+                  onOpen={() => {
+                    if (!isAllFiles && file.rootFolderId) selectFolder(activeFolderId ?? file.rootFolderId)
+                    openFile(file.id)
+                  }}
+                  onContextMenu={(event) => openMenu(event, file)}
+                />
+              )
+            })()
           ))}
           {files.length === 0 && <div className="list-empty">此资料夹没有直属的可打开文件</div>}
         </div>
@@ -177,7 +207,6 @@ export function FlatFileListPane() {
                   extension: menu.file.extension,
                   kind: 'file',
                   editable: menu.file.editable,
-                  content: contents[menu.file.id] ?? '',
                   node: {
                     id: menu.file.id,
                     name: menu.file.name,
@@ -188,6 +217,7 @@ export function FlatFileListPane() {
                 })
                 removeFile(menu.file.id)
               }
+              removePreview(menu.file.path)
               removeContent(menu.file.id)
               if (activeFileId === menu.file.id) closeFile()
               showToast('已移到最近删除')

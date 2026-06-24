@@ -11,6 +11,14 @@ type SaveResult = {
   savedAt: string
 }
 
+export type FilePreviewPayload = {
+  path: string
+  title: string
+  summary: string
+  createdAt?: string
+  updatedAt?: string
+}
+
 export type FileWatchPayload = {
   eventType: 'file-created' | 'file-updated' | 'file-deleted' | 'file-renamed'
   paths: string[]
@@ -47,6 +55,46 @@ export async function readDirectoryTree(rootPath: string): Promise<FileTreeNode[
 export async function readTextFile(path: string, fileId?: string): Promise<string> {
   if (!isTauriRuntime()) return mockFileContents[fileId ?? path] ?? ''
   return invoke<string>('read_text_file', { path })
+}
+
+function stripMarkdownPreview(content: string) {
+  const lines = content
+    .replace(/```[\s\S]*?```/g, '\n')
+    .replace(/!\[[^\]]*]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
+    .split(/\n+/)
+    .map((line) => line
+      .replace(/^#{1,6}\s+/g, '')
+      .replace(/^[-*+]\s+\[[ xX]\]\s+/g, '')
+      .replace(/^[-*+]\s+/g, '')
+      .replace(/^>\s?/g, '')
+      .replace(/[*_~`|]/g, '')
+      .trim())
+    .filter(Boolean)
+  return lines
+}
+
+export async function readFilePreview(
+  path: string,
+  maxBytes = 4096,
+  maxLines = 2,
+  fileId?: string,
+): Promise<FilePreviewPayload> {
+  if (!isTauriRuntime()) {
+    const name = path.split('/').pop() ?? 'Untitled'
+    const ext = name.split('.').pop()?.toLowerCase()
+    if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(ext ?? '')) {
+      return { path, title: name, summary: '图片文件' }
+    }
+    const content = mockFileContents[fileId ?? path] ?? ''
+    const lines = stripMarkdownPreview(content.slice(0, maxBytes))
+    return {
+      path,
+      title: lines[0] || name.replace(/\.(md|markdown)$/i, ''),
+      summary: lines.slice(1, 1 + maxLines).join(' · ') || lines[0] || '暂无预览',
+    }
+  }
+  return invoke<FilePreviewPayload>('read_file_preview', { path, maxBytes, maxLines })
 }
 
 export async function writeTextFile(path: string, content: string): Promise<SaveResult> {
@@ -136,4 +184,3 @@ export async function watchPaths(
   if (!onEvent) return null
   return listen<FileWatchPayload>('jsondown://file-watch', (event) => onEvent(event.payload))
 }
-

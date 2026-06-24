@@ -24,8 +24,8 @@ pub fn metadata_times(path: &Path) -> (Option<String>, Option<String>, Option<u6
     let Ok(meta) = fs::metadata(path) else {
         return (None, None, None);
     };
-    let created = meta.created().ok().map(iso_time);
     let updated = meta.modified().ok().map(iso_time);
+    let created = meta.created().ok().map(iso_time).or_else(|| updated.clone());
     let size = if meta.is_file() { Some(meta.len()) } else { None };
     (created, updated, size)
 }
@@ -67,4 +67,3 @@ pub fn ensure_child_name(name: &str, default_extension: Option<&str>) -> String 
         format!("{}.{}", base, default_extension.unwrap())
     }
 }
-

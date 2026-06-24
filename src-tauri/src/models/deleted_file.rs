@@ -9,6 +9,8 @@ pub struct DeletedFile {
     pub original_path: String,
     pub trash_path: String,
     pub deleted_at: String,
+    pub original_created_at: Option<String>,
+    pub original_updated_at: Option<String>,
     pub extension: Option<String>,
 }
 
@@ -23,4 +25,3 @@ pub enum DeletedKind {
 pub struct TrashIndex {
     pub items: Vec<DeletedFile>,
 }
-

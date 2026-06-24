@@ -9,6 +9,8 @@ export type DeletedFile = {
   originalRootFolderId?: string
   originalParentId?: string
   deletedAt: string
+  originalCreatedAt?: string
+  originalUpdatedAt?: string
   extension?: string
   editable?: boolean
   content?: string

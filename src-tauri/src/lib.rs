@@ -4,7 +4,7 @@ mod utils;
 
 use commands::{
     config::{load_app_config, save_app_config},
-    files::{create_file, read_text_file, rename_path, write_text_file},
+    files::{create_file, read_file_preview, read_text_file, rename_path, write_text_file},
     finder::reveal_in_finder,
     folders::{create_child_folder, create_root_folder, read_directory_tree, select_root_folder},
     trash::{
@@ -21,6 +21,7 @@ pub fn run() {
             select_root_folder,
             create_root_folder,
             read_directory_tree,
+            read_file_preview,
             read_text_file,
             write_text_file,
             reveal_in_finder,
@@ -38,4 +39,3 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running Jsondown");
 }
-

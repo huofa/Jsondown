@@ -33,9 +33,9 @@ function directFiles(
       editable: isEditableFile(node.name),
       parentFolderName,
       parentFolderPath,
-      createdAt: meta?.createdAt,
-      updatedAt: meta?.updatedAt,
-      size: meta?.size,
+      createdAt: node.createdAt ?? meta?.createdAt,
+      updatedAt: node.updatedAt ?? meta?.updatedAt,
+      size: node.size ?? meta?.size,
     }]
   })
 }
