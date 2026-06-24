@@ -398,11 +398,11 @@
 }
 
 .app-frame {
-  --custom-editor-font-size: 16px;
-  --custom-editor-line-height: 1.82;
-  --custom-editor-paragraph-spacing: 12px;
-  --custom-editor-letter-spacing: .1px;
-  --custom-editor-horizontal-padding: 22px;
+  --custom-editor-font-size: 14px;
+  --custom-editor-line-height: 1.25;
+  --custom-editor-paragraph-spacing: -10px;
+  --custom-editor-letter-spacing: -.4px;
+  --custom-editor-horizontal-padding: 4px;
 }
 .paper {
   padding-inline: var(--custom-editor-horizontal-padding);
