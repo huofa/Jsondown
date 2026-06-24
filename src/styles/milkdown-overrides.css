@@ -1,8 +1,8 @@
-.milkdown-host, .milkdown-host .milkdown { min-height: 100%; color: inherit; background: transparent !important; }
+.milkdown-host, .milkdown-host .milkdown { min-height: 0; color: inherit; background: transparent !important; }
 .milkdown-host .milkdown { border: 0 !important; box-shadow: none !important; }
 
 .milkdown-host .ProseMirror {
-  min-height: calc(100vh - 120px);
+  min-height: 1.82em;
   padding: 0 !important;
   outline: none;
   color: inherit;
