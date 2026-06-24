@@ -2,6 +2,7 @@ use std::fs;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::time::Instant;
 
 use crate::models::file_tree::{FileTreeKind, FileTreeNode};
 use crate::utils::ignore_rules::{extension, is_supported_text_file};
@@ -132,11 +133,21 @@ fn build_preview(path: &Path, content: &str, max_lines: usize) -> (String, Strin
 
 #[tauri::command]
 pub fn read_text_file(path: String) -> Result<String, String> {
+    let started = Instant::now();
     let path = Path::new(&path);
     if !is_supported_text_file(path) {
         return Err("不支持读取该文件类型".to_string());
     }
-    fs::read_to_string(path).map_err(|err| err.to_string())
+    let content = fs::read_to_string(path).map_err(|err| err.to_string())?;
+    if cfg!(debug_assertions) {
+        println!(
+            "[perf][read_text_file] path={} bytes={} duration={:.1}ms",
+            path_to_string(path),
+            content.len(),
+            started.elapsed().as_secs_f64() * 1000.0
+        );
+    }
+    Ok(content)
 }
 
 #[tauri::command]
@@ -185,11 +196,29 @@ pub fn read_file_preview(
 
 #[tauri::command]
 pub fn write_text_file(path: String, content: String) -> Result<SaveResult, String> {
+    let started = Instant::now();
     let path = Path::new(&path);
     if !is_supported_text_file(path) {
         return Err("不支持写入该文件类型".to_string());
     }
+    let bytes = content.len();
     fs::write(path, content).map_err(|err| err.to_string())?;
+    if cfg!(debug_assertions) {
+        let duration_ms = started.elapsed().as_secs_f64() * 1000.0;
+        println!(
+            "[perf][write_text_file] path={} bytes={} duration={:.1}ms",
+            path_to_string(path),
+            bytes,
+            duration_ms
+        );
+        if duration_ms > 300.0 {
+            println!(
+                "[perf][write_text_file][warning] path={} duration={:.1}ms",
+                path_to_string(path),
+                duration_ms
+            );
+        }
+    }
     Ok(SaveResult {
         ok: true,
         saved_at: chrono::Utc::now().to_rfc3339(),

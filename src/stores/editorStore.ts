@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { SaveStatus } from '../types/editor'
 import { isTauriRuntime, readTextFile, writeTextFile } from '../services/tauriFileService'
 import { mockFileContents } from '../utils/mockFileSystem'
+import { perfMonitor } from '../devtools/perfMonitor'
 
 type EditorState = {
   activeFileId: string | null
@@ -29,11 +30,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   openFile: (id) => set({ activeFileId: id, saveStatus: 'idle', savedAt: null }),
   closeFile: () => set({ activeFileId: null, saveStatus: 'idle', savedAt: null }),
   loadFileContent: async (id, path, kind) => {
+    perfMonitor.markFileLoading(path)
     if (kind === 'image') {
       set((state) => ({
         contents: { ...state.contents, [id]: path },
         loadedPaths: { ...state.loadedPaths, [id]: path },
       }))
+      perfMonitor.finishFileOpen(path)
       return
     }
     if (get().loadedPaths[id] === path && get().contents[id] !== undefined) return
@@ -44,6 +47,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         loadedPaths: { ...state.loadedPaths, [id]: path },
         saveStatus: state.activeFileId === id ? 'idle' : state.saveStatus,
       }))
+      perfMonitor.currentFile(path, content.length, content)
+      if (kind !== 'markdown') perfMonitor.finishFileOpen(path)
     } catch {
       set({ saveStatus: 'error' })
     }
@@ -52,6 +57,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const content = get().contents[id] ?? ''
     try {
       set({ saveStatus: 'saving' })
+      perfMonitor.instant('file-write', 'save-queue', {
+        path,
+        charCount: content.length,
+        detail: { status: 'saving' },
+      })
+      perfMonitor.measureSync('serialize', 'serialize-snapshot', () => content, {
+        path,
+        charCount: content.length,
+        detail: { reason: 'autosave' },
+      })
       const result = await writeTextFile(path, content)
       set({ saveStatus: result.ok ? 'saved' : 'error', savedAt: result.savedAt })
     } catch {
@@ -59,10 +74,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
   updateContent: (id, content) =>
-    set((state) => ({
-      contents: { ...state.contents, [id]: content },
-      saveStatus: 'dirty',
-    })),
+    set((state) => {
+      if (state.contents[id] === content) {
+        perfMonitor.warning('input-transaction', 'selection-only-triggered-save', {
+          detail: { fileId: id },
+        })
+        return state
+      }
+      return {
+        contents: { ...state.contents, [id]: content },
+        saveStatus: 'dirty',
+      }
+    }),
   addContent: (id, content) =>
     set((state) => ({ contents: { ...state.contents, [id]: content } })),
   removeContent: (id) =>
@@ -81,4 +104,3 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 }))
 
 void isTauriRuntime
-

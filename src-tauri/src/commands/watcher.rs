@@ -28,14 +28,22 @@ fn event_name(kind: &EventKind) -> String {
 }
 
 fn emit_event(app: &AppHandle, event: Event) {
+    let event_type = event_name(&event.kind);
     let payload = FileWatchEvent {
-        event_type: event_name(&event.kind),
+        event_type,
         paths: event
             .paths
             .into_iter()
             .map(|path| path.to_string_lossy().to_string())
             .collect(),
     };
+    if cfg!(debug_assertions) {
+        println!(
+            "[perf][watcher] type={} paths={}",
+            payload.event_type,
+            payload.paths.join(",")
+        );
+    }
     let _ = app.emit("jsondown://file-watch", payload);
 }
 
@@ -68,4 +76,3 @@ pub fn watch_paths(
     *state.watcher.lock().map_err(|err| err.to_string())? = Some(watcher);
     Ok(())
 }
-

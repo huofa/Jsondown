@@ -10,6 +10,8 @@ import { useSettingsStore } from './stores/settingsStore'
 import { watchPaths } from './services/tauriFileService'
 import { flattenFiles } from './utils/flattenFiles'
 import { getDirectFilesForSelection } from './utils/folderSelection'
+import { PerfPanel } from './devtools/PerfPanel'
+import { perfMonitor } from './devtools/perfMonitor'
 
 export default function App() {
   const folders = useRootFolderStore((state) => state.folders)
@@ -35,11 +37,24 @@ export default function App() {
       const activeFile = folders
         .flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id))
         .find((file) => file.id === activeFileId)
-      if (activeFile && event.paths.includes(activeFile.path)) {
+      const isSelfSaveEvent = event.paths.some((path) => perfMonitor.classifyWatcher(path) === 'self-save')
+      const touchesActiveFile = Boolean(activeFile && event.paths.includes(activeFile.path))
+      if (touchesActiveFile && isSelfSaveEvent) {
+        perfMonitor.instant('watcher', '[warning] self-save-triggered-reload-blocked', {
+          path: activeFile?.path,
+          detail: { eventType: event.eventType },
+        })
+      }
+      if (activeFile && event.paths.includes(activeFile.path) && !isSelfSaveEvent) {
         setSaveStatus('external-changed')
       }
-      void refreshAllRootFolders()
-      void loadRecentlyDeleted(rootPaths)
+      if (!isSelfSaveEvent) {
+        perfMonitor.instant('watcher', 'refresh-file-tree', {
+          detail: { eventType: event.eventType, paths: event.paths.length },
+        })
+        void refreshAllRootFolders()
+        void loadRecentlyDeleted(rootPaths)
+      }
     }).then((unlisten) => { cleanup = unlisten })
     return () => cleanup?.()
   }, [activeFileId, folders, loadRecentlyDeleted, refreshAllRootFolders, setSaveStatus])
@@ -69,6 +84,7 @@ export default function App() {
         middle={<FlatFileListPane />}
         right={<EditorPane />}
       />
+      <PerfPanel />
     </div>
   )
 }

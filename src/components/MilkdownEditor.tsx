@@ -20,24 +20,44 @@ import {
 import { insertTableCommand, toggleStrikethroughCommand } from '@milkdown/kit/preset/gfm'
 import { useEffect, useRef } from 'react'
 import type { EditorCommand, EditorCommandApi } from '../types/editorCommand'
+import { perfMonitor } from '../devtools/perfMonitor'
 
 type MilkdownEditorProps = {
   value: string
+  path?: string
+  fileSize?: number
   onChange: (markdown: string) => void
   onReady?: (api: EditorCommandApi | null) => void
 }
 
-export function MilkdownEditor({ value, onChange, onReady }: MilkdownEditorProps) {
+export function MilkdownEditor({ value, path, fileSize, onChange, onReady }: MilkdownEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const onChangeRef = useRef(onChange)
   const onReadyRef = useRef(onReady)
   const initialValueRef = useRef(value)
+  const pathRef = useRef(path)
+  const fileSizeRef = useRef(fileSize)
   onChangeRef.current = onChange
   onReadyRef.current = onReady
+  pathRef.current = path
+  fileSizeRef.current = fileSize
 
   useEffect(() => {
     if (!rootRef.current) return
     let disposed = false
+    const initEvent = perfMonitor.begin('crepe-init', 'crepe-create-to-ready', {
+      path: pathRef.current,
+      fileSize: fileSizeRef.current,
+      lineCount: initialValueRef.current.split(/\r?\n/).length,
+      charCount: initialValueRef.current.length,
+    })
+    if ((fileSizeRef.current ?? initialValueRef.current.length) > 1024 * 1024) {
+      perfMonitor.warning('crepe-init', 'large-file-warning', {
+        path: pathRef.current,
+        fileSize: fileSizeRef.current,
+        charCount: initialValueRef.current.length,
+      })
+    }
     const crepe = new Crepe({
       root: rootRef.current,
       defaultValue: initialValueRef.current,
@@ -56,6 +76,14 @@ export function MilkdownEditor({ value, onChange, onReady }: MilkdownEditorProps
 
     crepe.on((listener) => {
       listener.markdownUpdated((_ctx, markdown, previousMarkdown) => {
+        const serializeEvent = perfMonitor.begin('serialize', 'markdown-updated', {
+          path: pathRef.current,
+          charCount: markdown.length,
+          detail: { reason: 'input-transaction' },
+        })
+        perfMonitor.end(serializeEvent, {
+          changedChars: Math.abs(markdown.length - previousMarkdown.length),
+        })
         if (!disposed && markdown !== previousMarkdown) onChangeRef.current(markdown)
       })
     })
@@ -94,6 +122,30 @@ export function MilkdownEditor({ value, onChange, onReady }: MilkdownEditorProps
     const createPromise = crepe.create()
     void createPromise.then(() => {
       if (disposed) return
+      crepe.editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx) as unknown as {
+          dispatch: (transaction: { docChanged?: boolean; selectionSet?: boolean; steps?: unknown[] }) => void
+        }
+        const originalDispatch = view.dispatch.bind(view)
+        view.dispatch = (transaction) => {
+          const startedAt = performance.now()
+          originalDispatch(transaction)
+          const durationMs = performance.now() - startedAt
+          const docChanged = Boolean(transaction.docChanged)
+          const selectionOnly = !docChanged && Boolean(transaction.selectionSet)
+          perfMonitor.instant('input-transaction', docChanged ? 'input' : 'selection-only', {
+            path: pathRef.current,
+            durationMs,
+            detail: {
+              docChanged,
+              selectionOnly,
+              stepCount: transaction.steps?.length ?? 0,
+            },
+          })
+        }
+      })
+      perfMonitor.end(initEvent)
+      if (pathRef.current) perfMonitor.finishFileOpen(pathRef.current)
       onReadyRef.current?.({
         run,
         heading: (level) =>

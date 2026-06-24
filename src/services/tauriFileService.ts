@@ -5,6 +5,7 @@ import type { DeletedFile } from '../types/deletedFile'
 import type { FileTreeNode } from '../types/fileTree'
 import type { RootFolder } from '../types/rootFolder'
 import { createMockFolder, mockFileContents, mockRootFolders } from '../utils/mockFileSystem'
+import { perfMonitor } from '../devtools/perfMonitor'
 
 type SaveResult = {
   ok: boolean
@@ -53,8 +54,20 @@ export async function readDirectoryTree(rootPath: string): Promise<FileTreeNode[
 }
 
 export async function readTextFile(path: string, fileId?: string): Promise<string> {
-  if (!isTauriRuntime()) return mockFileContents[fileId ?? path] ?? ''
-  return invoke<string>('read_text_file', { path })
+  const event = perfMonitor.begin('file-read', 'read_text_file', { path })
+  try {
+    const content = !isTauriRuntime()
+      ? mockFileContents[fileId ?? path] ?? ''
+      : await invoke<string>('read_text_file', { path })
+    perfMonitor.end(event, {
+      chars: content.length,
+      lines: content.split(/\r?\n/).length,
+    })
+    return content
+  } catch (error) {
+    perfMonitor.end(event, { error: error instanceof Error ? error.message : String(error) })
+    throw error
+  }
 }
 
 function stripMarkdownPreview(content: string) {
@@ -98,8 +111,26 @@ export async function readFilePreview(
 }
 
 export async function writeTextFile(path: string, content: string): Promise<SaveResult> {
-  if (!isTauriRuntime()) return { ok: true, savedAt: new Date().toISOString() }
-  return invoke<SaveResult>('write_text_file', { path, content })
+  const writeState = perfMonitor.beginWrite(path)
+  const event = perfMonitor.begin('file-write', 'write-text-file', {
+    path,
+    charCount: content.length,
+    detail: {
+      bytesApprox: new Blob([content]).size,
+      concurrent: writeState.concurrent,
+    },
+  })
+  try {
+    const result = !isTauriRuntime()
+      ? { ok: true, savedAt: new Date().toISOString() }
+      : await invoke<SaveResult>('write_text_file', { path, content })
+    const done = perfMonitor.end(event)
+    perfMonitor.endWrite(path, done.durationMs)
+    return result
+  } catch (error) {
+    perfMonitor.end(event, { error: error instanceof Error ? error.message : String(error) })
+    throw error
+  }
 }
 
 export async function revealInFinder(path: string): Promise<void> {
@@ -182,5 +213,20 @@ export async function watchPaths(
   if (!isTauriRuntime()) return null
   await invoke<void>('watch_paths', { paths })
   if (!onEvent) return null
-  return listen<FileWatchPayload>('jsondown://file-watch', (event) => onEvent(event.payload))
+  return listen<FileWatchPayload>('jsondown://file-watch', (event) => {
+    event.payload.paths.forEach((path) => {
+      const source = perfMonitor.classifyWatcher(path)
+      perfMonitor.instant('watcher', event.payload.eventType, {
+        path,
+        detail: { source },
+      })
+      if (source === 'self-save') {
+        perfMonitor.instant('watcher', 'possible-self-save-event', {
+          path,
+          detail: { source },
+        })
+      }
+    })
+    onEvent(event.payload)
+  })
 }

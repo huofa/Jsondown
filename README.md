@@ -86,3 +86,62 @@ npm run build:web
 - 图片预览在 Tauri 下可以继续升级为 `convertFileSrc` 或自定义 asset protocol。
 - 文件监听是基础版，复杂 rename / 批量变更边界后续继续增强。
 - JSON block、HTML inline preview、纸张主题精修、MD 快捷菜单和包体积优化不在 V1.0 范围内。
+
+## jianceV1.0 性能检测分支说明
+
+`jianceV1.0` 分支只用于识别卡顿来源，不新增业务功能。检测逻辑只在开发模式启用，生产构建默认关闭前端 PerfPanel。
+
+### PerfPanel 打开方式
+
+- 开发模式右下角会显示 `Perf` 按钮。
+- 也可以使用快捷键 `⌘ + Shift + P` 打开 / 关闭。
+
+PerfPanel 会显示：
+
+- 当前打开文件、大小、行数、字符数。
+- 最近一次点击打开总耗时。
+- 最近一次 `read_text_file` 耗时。
+- 最近一次 Crepe 初始化耗时。
+- 最近 5 秒 transaction / docChanged / selection-only 数量。
+- 最近 5 秒 serialize 次数。
+- 最近一次写入耗时。
+- watcher 总事件、自保存事件、外部事件。
+- 浏览器支持时显示 JS heap。
+
+### 控制台日志类别
+
+- `[perf][file-click]`：点击文件到 loading、打开总耗时。
+- `[perf][file-read]`：前端 `read_text_file` 调用耗时。
+- `[perf][crepe-init]`：Crepe 从 create 到 ready 的耗时。
+- `[perf][input-transaction]`：ProseMirror transaction，区分 `docChanged` 与 selection-only。
+- `[perf][serialize]`：Markdown 更新 / 自动保存快照序列化触发次数和耗时。
+- `[perf][file-write]`：前端保存队列和写入耗时。
+- `[perf][watcher]`：watcher 事件，并区分 `self-save` 和 `external`。
+- `[perf][memory]`：当前文件和 JS heap 采样。
+
+Rust debug 模式额外输出：
+
+- `[perf][read_text_file] path=... bytes=... duration=...ms`
+- `[perf][write_text_file] path=... bytes=... duration=...ms`
+- `[perf][watcher] type=... paths=...`
+
+### 阈值 warning
+
+- `read_text_file > 300ms`
+- `Crepe init > 500ms`
+- `serialize > 200ms`
+- `write_text_file > 300ms`
+- 5 秒内 `serialize > 3` 次
+- 5 秒内 watcher event > 20 次
+- selection-only 误触发保存
+
+### macOS 手动进程检测命令
+
+Rust RSS 获取当前是 TODO，可先用系统命令观察：
+
+```bash
+ps aux | grep -i "jsondown\\|vite\\|node\\|WebKit" | grep -v grep
+top -o cpu
+sample <pid> 5 -file jsondown-sample.txt
+vmmap <pid> | head -80
+```

@@ -103,6 +103,8 @@ export function EditorPane() {
               <MilkdownEditor
                 key={file.id}
                 value={content}
+                path={file.path}
+                fileSize={file.size}
                 onReady={setEditorApi}
                 onChange={(markdown) => updateContent(file.id, markdown)}
               />

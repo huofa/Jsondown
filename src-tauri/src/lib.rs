@@ -7,6 +7,7 @@ use commands::{
     files::{create_file, read_file_preview, read_text_file, rename_path, write_text_file},
     finder::reveal_in_finder,
     folders::{create_child_folder, create_root_folder, read_directory_tree, select_root_folder},
+    perf::get_process_memory,
     trash::{
         list_recently_deleted, move_to_recently_deleted, permanently_delete_trash_item,
         restore_deleted_file,
@@ -35,6 +36,7 @@ pub fn run() {
             restore_deleted_file,
             permanently_delete_trash_item,
             watch_paths,
+            get_process_memory,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Jsondown");

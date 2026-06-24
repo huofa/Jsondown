@@ -15,6 +15,7 @@ import {
   moveToRecentlyDeleted as movePathToRecentlyDeleted,
   revealInFinder,
 } from '../services/tauriFileService'
+import { perfMonitor } from '../devtools/perfMonitor'
 import type { EditableFile, SortMode } from '../types/file'
 import { findParentFolderId, getDirectFilesForSelection, getFolderSelection } from '../utils/folderSelection'
 import { flattenFiles } from '../utils/flattenFiles'
@@ -152,6 +153,7 @@ export function FlatFileListPane() {
                   selected={activeFileId === file.id}
                   showParentFolder={isAllFiles}
                   onOpen={() => {
+                    perfMonitor.beginFileOpen(file.path, file.size)
                     if (!isAllFiles && file.rootFolderId) selectFolder(activeFolderId ?? file.rootFolderId)
                     openFile(file.id)
                   }}
