@@ -381,7 +381,6 @@
 .density-comfortable .paper,
 .density-custom .paper { max-width: 1080px; }
 .density-custom .paper {
-  max-width: var(--custom-editor-max-width);
   padding-inline: var(--custom-editor-horizontal-padding);
 }
 

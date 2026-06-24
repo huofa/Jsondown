@@ -80,9 +80,8 @@ export default function App() {
       style={{
         '--custom-editor-font-size': `${customEditorLayout.fontSize}px`,
         '--custom-editor-line-height': customEditorLayout.lineHeight,
-        '--custom-editor-paragraph-spacing': `${customEditorLayout.paragraphSpacing}em`,
+        '--custom-editor-letter-spacing': `${customEditorLayout.letterSpacing}px`,
         '--custom-editor-horizontal-padding': `${customEditorLayout.horizontalPadding}px`,
-        '--custom-editor-max-width': `${customEditorLayout.maxWidth}px`,
       } as CSSProperties}
     >
       <ResizablePanels

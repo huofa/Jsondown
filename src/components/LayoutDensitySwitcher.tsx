@@ -18,7 +18,6 @@ export function LayoutDensitySwitcher() {
   const setLayoutDensity = useSettingsStore((state) => state.setLayoutDensity)
   const setCustomEditorLayout = useSettingsStore((state) => state.setCustomEditorLayout)
   const resetCustomEditorLayout = useSettingsStore((state) => state.resetCustomEditorLayout)
-  const label = options.find((option) => option.id === layoutDensity)?.label
 
   useEffect(() => {
     if (!open) return
@@ -38,7 +37,7 @@ export function LayoutDensitySwitcher() {
     <div className="density-switcher" ref={ref}>
       <button title="排版设置" aria-label="排版设置" onClick={() => setOpen((value) => !value)}>
         <AlignJustify size={14} />
-        <span>{label}</span>
+        <span>排版</span>
         <ChevronDown size={10} />
       </button>
       {open && (
@@ -69,7 +68,7 @@ export function LayoutDensitySwitcher() {
                 />
               </label>
               <label>
-                行距 <span>{customEditorLayout.lineHeight.toFixed(2)}</span>
+                上下间距 <span>{customEditorLayout.lineHeight.toFixed(2)}</span>
                 <input
                   type="range"
                   min="1.4"
@@ -80,14 +79,14 @@ export function LayoutDensitySwitcher() {
                 />
               </label>
               <label>
-                段距 <span>{customEditorLayout.paragraphSpacing.toFixed(2)}em</span>
+                字间距 <span>{customEditorLayout.letterSpacing.toFixed(1)}px</span>
                 <input
                   type="range"
-                  min="0.25"
-                  max="1.25"
-                  step="0.05"
-                  value={customEditorLayout.paragraphSpacing}
-                  onChange={(event) => setCustomEditorLayout({ paragraphSpacing: Number(event.target.value) })}
+                  min="-0.4"
+                  max="1.2"
+                  step="0.1"
+                  value={customEditorLayout.letterSpacing}
+                  onChange={(event) => setCustomEditorLayout({ letterSpacing: Number(event.target.value) })}
                 />
               </label>
               <label>
@@ -99,17 +98,6 @@ export function LayoutDensitySwitcher() {
                   step="2"
                   value={customEditorLayout.horizontalPadding}
                   onChange={(event) => setCustomEditorLayout({ horizontalPadding: Number(event.target.value) })}
-                />
-              </label>
-              <label>
-                正文宽度 <span>{customEditorLayout.maxWidth}px</span>
-                <input
-                  type="range"
-                  min="760"
-                  max="1280"
-                  step="20"
-                  value={customEditorLayout.maxWidth}
-                  onChange={(event) => setCustomEditorLayout({ maxWidth: Number(event.target.value) })}
                 />
               </label>
               <button className="density-reset" onClick={resetCustomEditorLayout}>恢复默认</button>

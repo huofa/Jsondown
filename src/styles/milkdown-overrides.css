@@ -48,9 +48,7 @@
 .density-custom .milkdown-host .ProseMirror {
   font-size: var(--custom-editor-font-size);
   line-height: var(--custom-editor-line-height);
-}
-.density-custom .milkdown-host .ProseMirror p {
-  margin: var(--custom-editor-paragraph-spacing) 0;
+  letter-spacing: var(--custom-editor-letter-spacing);
 }
 
 .milkdown-host [data-milkdown-root] { background: transparent !important; }
