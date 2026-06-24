@@ -7,6 +7,7 @@ import { revealInFinder } from '../services/tauriFileService'
 import type { EditorCommandApi } from '../types/editorCommand'
 import { flattenFiles } from '../utils/flattenFiles'
 import { formatDisplayTime } from '../utils/formatDisplayTime'
+import { startWindowDrag } from '../utils/windowDrag'
 import { ImagePreview } from './ImagePreview'
 import { MilkdownEditor } from './MilkdownEditor'
 import { ReadonlyCodeViewer } from './ReadonlyCodeViewer'
@@ -90,7 +91,7 @@ export function EditorPane() {
 
   return (
     <div className={`editor-shell ${theme}`}>
-      <header className="editor-header">
+      <header className="editor-header" data-tauri-drag-region onPointerDownCapture={startWindowDrag}>
         <SidebarCollapseButton />
         <button className="new-document-button" onClick={createDocument} title="新建文档" aria-label="新建文档">
           <SquarePen size={15} />
