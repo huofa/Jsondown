@@ -3,8 +3,10 @@ import { readFilePreview, type FilePreviewPayload } from '../services/tauriFileS
 import type { EditableFile } from '../types/file'
 
 export const FIRST_PREVIEW_COUNT = 20
+export const LAST_PREVIEW_COUNT = 20
 export const PAGE_SIZE = 8
 export const PRELOAD_NEXT_PAGE_COUNT = 8
+export const PRELOAD_PREVIOUS_PAGE_COUNT = 8
 export const MAX_PREVIEW_CONCURRENCY = 3
 
 export type FilePreviewStatus = 'idle' | 'loading' | 'loaded' | 'error'
@@ -103,7 +105,8 @@ export const useFilePreviewStore = create<FilePreviewStore>((set, get) => ({
     runQueue(set)
   },
   ensurePreviews: (files, start, count) => {
-    files.slice(start, start + count).forEach((file) => get().loadPreview(file))
+    const safeStart = Math.max(0, start)
+    files.slice(safeStart, safeStart + count).forEach((file) => get().loadPreview(file))
   },
   removePreview: (path) => {
     set((state) => ({

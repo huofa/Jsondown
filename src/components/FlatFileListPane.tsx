@@ -4,8 +4,10 @@ import { useEditorStore } from '../stores/editorStore'
 import { useFileListStore } from '../stores/fileListStore'
 import {
   FIRST_PREVIEW_COUNT,
+  LAST_PREVIEW_COUNT,
   PAGE_SIZE,
   PRELOAD_NEXT_PAGE_COUNT,
+  PRELOAD_PREVIOUS_PAGE_COUNT,
   useFilePreviewStore,
 } from '../stores/filePreviewStore'
 import { useRecentlyDeletedStore } from '../stores/recentlyDeletedStore'
@@ -97,6 +99,7 @@ export function FlatFileListPane() {
   useEffect(() => {
     if (isRecentlyDeleted) return
     ensurePreviews(files, 0, FIRST_PREVIEW_COUNT)
+    ensurePreviews(files, Math.max(0, files.length - LAST_PREVIEW_COUNT), LAST_PREVIEW_COUNT)
   }, [ensurePreviews, files, isRecentlyDeleted])
 
   useEffect(() => {
@@ -124,9 +127,9 @@ export function FlatFileListPane() {
     const target = event.currentTarget
     const pageHeight = Math.max(target.clientHeight, 1)
     const screen = Math.floor(target.scrollTop / pageHeight)
-    if (screen < 1) return
-    const start = FIRST_PREVIEW_COUNT + ((screen - 1) * PAGE_SIZE)
-    ensurePreviews(files, start, PRELOAD_NEXT_PAGE_COUNT)
+    const currentPageStart = screen * PAGE_SIZE
+    ensurePreviews(files, currentPageStart - PAGE_SIZE, PRELOAD_PREVIOUS_PAGE_COUNT)
+    ensurePreviews(files, currentPageStart + PAGE_SIZE, PRELOAD_NEXT_PAGE_COUNT)
   }
 
   const openMenu = (event: MouseEvent, file: EditableFile) => {

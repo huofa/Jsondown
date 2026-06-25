@@ -1,6 +1,7 @@
 import { FileQuestion, FolderOpen, MoreHorizontal, SquarePen } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useEditorStore } from '../stores/editorStore'
+import { useOpenedFileCacheStore } from '../stores/openedFileCacheStore'
 import { useRootFolderStore } from '../stores/rootFolderStore'
 import { useThemeStore } from '../stores/themeStore'
 import { revealInFinder } from '../services/tauriFileService'
@@ -10,7 +11,7 @@ import { formatDisplayTime } from '../utils/formatDisplayTime'
 import { startWindowDrag } from '../utils/windowDrag'
 import { ImagePreview } from './ImagePreview'
 import { MilkdownEditor } from './MilkdownEditor'
-import { ReadonlyCodeViewer } from './ReadonlyCodeViewer'
+import { ReadonlyChunkViewer } from './ReadonlyChunkViewer'
 import { SaveStatus } from './SaveStatus'
 import { ThemeSwitcher } from './ThemeSwitcher'
 import { ToastHost, showToast } from './Toast'
@@ -25,8 +26,14 @@ export function EditorPane() {
   const { activeFileId, contents, pendingEmptyFile, saveStatus, openFile, updateContent } = useEditorStore()
   const loadFileContent = useEditorStore((state) => state.loadFileContent)
   const saveFileContent = useEditorStore((state) => state.saveFileContent)
+  const readonlyEntries = useOpenedFileCacheStore((state) => state.entries)
+  const openReadonlyFile = useOpenedFileCacheStore((state) => state.openReadonlyFile)
+  const loadNextReadonlyChunk = useOpenedFileCacheStore((state) => state.loadNextReadonlyChunk)
+  const updateReadonlyScrollTop = useOpenedFileCacheStore((state) => state.updateScrollTop)
+  const getReadonlyKey = useOpenedFileCacheStore((state) => state.getCacheKey)
   const theme = useThemeStore((state) => state.theme)
   const [editorApi, setEditorApi] = useState<EditorCommandApi | null>(null)
+  const [editingFileId, setEditingFileId] = useState<string | null>(null)
   const saveTimer = useRef<number | undefined>(undefined)
   const editorScrollRef = useRef<HTMLDivElement>(null)
 
@@ -37,20 +44,49 @@ export function EditorPane() {
   const file = allFiles.find((item) => item.id === activeFileId)
   const content = activeFileId ? (contents[activeFileId] ?? '') : ''
   const isNewFileLocked = Boolean(pendingEmptyFile && !(contents[pendingEmptyFile.id] ?? '').trim())
+  const readonlyEntry = file ? readonlyEntries[getReadonlyKey(file)] : undefined
+  const isEditing = Boolean(file?.editable && editingFileId === file.id)
 
   useEffect(() => {
     if (!file) return
-    void loadFileContent(file.id, file.path, file.kind)
-  }, [file?.id, file?.kind, file?.path, loadFileContent])
+    if (pendingEmptyFile?.id === file.id) {
+      setEditingFileId(file.id)
+      return
+    }
+    if (file.kind === 'image') {
+      void loadFileContent(file.id, file.path, file.kind)
+      return
+    }
+    if (!isEditing) void openReadonlyFile(file)
+  }, [file, isEditing, loadFileContent, openReadonlyFile, pendingEmptyFile?.id])
 
   useEffect(() => {
-    if (saveStatus !== 'dirty' || !file?.editable) return
+    if (!file || isEditing || !readonlyEntry) return
+    const scroll = editorScrollRef.current
+    if (!scroll) return
+    window.requestAnimationFrame(() => {
+      scroll.scrollTop = readonlyEntry.scrollTop
+    })
+  }, [file?.id, isEditing, readonlyEntry?.path])
+
+  useEffect(() => {
+    if (!activeFileId) {
+      setEditingFileId(null)
+      return
+    }
+    if (pendingEmptyFile?.id === activeFileId) setEditingFileId(activeFileId)
+    else setEditingFileId(null)
+    setEditorApi(null)
+  }, [activeFileId, pendingEmptyFile?.id])
+
+  useEffect(() => {
+    if (saveStatus !== 'dirty' || !file?.editable || !isEditing) return
     window.clearTimeout(saveTimer.current)
     saveTimer.current = window.setTimeout(() => {
       void saveFileContent(file.id, file.path)
     }, 2500)
     return () => window.clearTimeout(saveTimer.current)
-  }, [content, file?.editable, file?.id, file?.path, saveFileContent, saveStatus])
+  }, [content, file?.editable, file?.id, file?.path, isEditing, saveFileContent, saveStatus])
 
   useEffect(() => () => {
     window.clearTimeout(saveTimer.current)
@@ -62,6 +98,13 @@ export function EditorPane() {
         openFile(id)
         showToast('已新建 Markdown 笔记')
       }
+    })
+  }
+
+  const enterEditing = () => {
+    if (!file?.editable) return
+    void loadFileContent(file.id, file.path, file.kind).then(() => {
+      setEditingFileId(file.id)
     })
   }
 
@@ -88,6 +131,16 @@ export function EditorPane() {
     }
 
     window.requestAnimationFrame(restoreScroll)
+  }
+
+  const handleEditorScroll = () => {
+    const scroll = editorScrollRef.current
+    if (!scroll || !file || isEditing || file.kind === 'image') return
+    updateReadonlyScrollTop(file, scroll.scrollTop)
+    const distanceToBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight
+    if (distanceToBottom < scroll.clientHeight * 1.5) {
+      void loadNextReadonlyChunk(file)
+    }
   }
 
   return (
@@ -130,9 +183,9 @@ export function EditorPane() {
           <p>Markdown 文件可以直接编辑，代码、文本与图片会以只读方式打开。</p>
         </div>
       ) : (
-        <div ref={editorScrollRef} className="editor-scroll">
+        <div ref={editorScrollRef} className="editor-scroll" onScroll={handleEditorScroll}>
           <div className="note-created-time">{formatDisplayTime(file.createdAt ?? file.updatedAt ?? new Date().toISOString())}</div>
-          {file.editable ? (
+          {file.editable && isEditing ? (
             <article className="paper">
               <MilkdownEditor
                 key={file.id}
@@ -145,7 +198,12 @@ export function EditorPane() {
           ) : file.kind === 'image' ? (
             <ImagePreview src={content} name={file.name} />
           ) : (
-            <ReadonlyCodeViewer content={content} language={file.extension} />
+            <ReadonlyChunkViewer
+              file={file}
+              entry={readonlyEntry}
+              editable={file.editable}
+              onEnterEdit={enterEditing}
+            />
           )}
         </div>
       )}
