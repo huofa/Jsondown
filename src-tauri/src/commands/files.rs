@@ -3,6 +3,8 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 
+use chrono::{Datelike, Local};
+
 use crate::models::file_tree::{FileTreeKind, FileTreeNode};
 use crate::utils::ignore_rules::{extension, is_supported_text_file, should_ignore};
 use crate::utils::path_utils::{ensure_child_name, file_name as path_file_name, metadata_times, path_to_string};
@@ -53,6 +55,20 @@ fn display_title_from_path(path: &Path) -> String {
         .or_else(|| name.strip_suffix(".md"))
         .unwrap_or(&name)
         .to_string()
+}
+
+fn default_note_stem_for_today() -> String {
+    let now = Local::now();
+    let weekday = match now.weekday().num_days_from_monday() {
+        0 => "星期一",
+        1 => "星期二",
+        2 => "星期三",
+        3 => "星期四",
+        4 => "星期五",
+        5 => "星期六",
+        _ => "星期日",
+    };
+    format!("{:04}年{:02}月{:02}日{}", now.year(), now.month(), now.day(), weekday)
 }
 
 fn strip_markdown_line(line: &str) -> String {
@@ -246,11 +262,12 @@ pub fn create_unique_markdown_file(parent_path: String) -> Result<FileTreeNode, 
         return Err("目标文件夹不存在".to_string());
     }
 
+    let base_stem = default_note_stem_for_today();
     for index in 0..10_000 {
         let stem = if index == 0 {
-            "新建文件".to_string()
+            base_stem.clone()
         } else {
-            format!("新建文件{}", index)
+            format!("{}-{}", base_stem, index)
         };
         let name = format!("{}.md", stem);
         let path = parent.join(name);

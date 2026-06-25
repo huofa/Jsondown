@@ -173,7 +173,9 @@ export async function createFile(parentPath: string, fileName: string): Promise<
 
 export async function createUniqueMarkdownFile(parentPath: string): Promise<FileTreeNode> {
   if (!isTauriRuntime()) {
-    const name = '新建文件.md'
+    const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
+    const now = new Date()
+    const name = `${now.getFullYear()}年${String(now.getMonth() + 1).padStart(2, '0')}月${String(now.getDate()).padStart(2, '0')}日${weekdays[now.getDay()]}.md`
     const path = `${parentPath}/${name}`
     return { id: path, name, path, kind: 'file', extension: 'md' }
   }
