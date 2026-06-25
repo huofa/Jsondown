@@ -4,6 +4,7 @@ import type { RootFolder } from '../types/rootFolder'
 import {
   createChildFolder,
   createFile,
+  createUniqueMarkdownFile,
   isTauriRuntime,
   loadAppConfig,
   readDirectoryTree,
@@ -11,6 +12,7 @@ import {
   saveAppConfig,
   selectRootFolder,
 } from '../services/tauriFileService'
+import { useEditorStore } from './editorStore'
 import { getFileKind, isEditableFile, normalizeExtension } from '../utils/fileFilters'
 import { createMockFolder, mockFileContents, mockFileMeta, mockRootFolders } from '../utils/mockFileSystem'
 
@@ -44,8 +46,18 @@ const uniqueId = (prefix: string) => `${prefix}-${Date.now()}-${Math.round(Math.
 const extensionFor = (name: string) => normalizeExtension(name || '未命名.md') || 'md'
 
 const fileNameFor = (name?: string) => {
-  const trimmed = name?.trim() || '新建笔记'
+  const trimmed = name?.trim() || '新建文件'
   return trimmed.includes('.') ? trimmed : `${trimmed}.md`
+}
+
+const uniqueMarkdownFileName = (siblings: FileTreeNode[]) => {
+  const existing = new Set(siblings.map((node) => node.name))
+  for (let index = 0; index < 10_000; index += 1) {
+    const stem = index === 0 ? '新建文件' : `新建文件${index}`
+    const name = `${stem}.md`
+    if (!existing.has(name) && !existing.has(stem)) return name
+  }
+  return `新建文件-${Date.now()}.md`
 }
 
 const renameFileNameFor = (currentName: string, nextName: string) => {
@@ -209,39 +221,49 @@ export const useRootFolderStore = create<RootFolderState>((set, get) => ({
     }))
     return createdId
   },
-  createMockDocument: async (folderId) => get().createMockFile(folderId, '新建笔记.md'),
+  createMockDocument: async (folderId) => get().createMockFile(folderId),
   createMockFile: async (folderId, rawName) => {
+    const editor = useEditorStore.getState()
+    if (editor.pendingEmptyFile && !(editor.contents[editor.pendingEmptyFile.id] ?? '').trim()) return null
+
     const folders = get().folders
     const root = findRootForSelection(folders, folderId)
     const parentPath = findPathForSelection(folders, folderId)
     if (!root || !parentPath) return null
 
     if (isTauriRuntime()) {
-      const node = await createFile(parentPath, rawName ?? '新建笔记.md')
+      const node = rawName?.trim()
+        ? await createFile(parentPath, rawName)
+        : await createUniqueMarkdownFile(parentPath)
       await get().refreshRootFolder(root.id)
       set({ activeFolderId: folderId && folderId !== 'all' ? folderId : root.id })
+      useEditorStore.getState().markPendingEmptyFile({ id: node.id, path: node.path, rootFolderId: root.id })
       return node.id
     }
 
     let createdId: string | null = null
-    const name = fileNameFor(rawName)
+    const selectedNode = folderId && folderId !== 'all'
+      ? findNodeById(root.tree ?? [], folderId)
+      : null
+    const siblings = selectedNode?.kind === 'directory'
+      ? (selectedNode.children ?? [])
+      : (root.tree ?? [])
+    const name = rawName?.trim() ? fileNameFor(rawName) : uniqueMarkdownFileName(siblings)
     const extension = extensionFor(name)
+    let createdPath = ''
     set((state) => ({
       folders: state.folders.map((folder) => {
         const makeNode = (parentPath: string): FileTreeNode => {
           const id = uniqueId('file-new')
           const path = `${parentPath}/${name}`
           createdId = id
+          createdPath = path
           mockFileMeta[path] = {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             size: 0,
           }
-          mockFileContents[id] = isEditableFile(name)
-            ? `# ${name.replace(/\.(md|markdown)$/i, '')}\n\n`
-            : getFileKind(extension) === 'json'
-              ? '{\n  "createdBy": "Jsondown mock"\n}'
-              : ''
+          mockFileContents[id] = ''
           return { id, name, path, kind: 'file', extension }
         }
 
@@ -255,6 +277,9 @@ export const useRootFolderStore = create<RootFolderState>((set, get) => ({
       }),
       activeFolderId: folderId && folderId !== 'all' ? folderId : state.activeFolderId,
     }))
+    if (createdId) {
+      useEditorStore.getState().markPendingEmptyFile({ id: createdId, path: createdPath, rootFolderId: root.id })
+    }
     return createdId
   },
   createMockSubfolder: async (folderId, rawName) => {

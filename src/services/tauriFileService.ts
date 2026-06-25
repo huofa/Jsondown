@@ -171,6 +171,20 @@ export async function createFile(parentPath: string, fileName: string): Promise<
   return invoke<FileTreeNode>('create_file', { parentPath, fileName })
 }
 
+export async function createUniqueMarkdownFile(parentPath: string): Promise<FileTreeNode> {
+  if (!isTauriRuntime()) {
+    const name = '新建文件.md'
+    const path = `${parentPath}/${name}`
+    return { id: path, name, path, kind: 'file', extension: 'md' }
+  }
+  return invoke<FileTreeNode>('create_unique_markdown_file', { parentPath })
+}
+
+export async function deleteEmptyFileIfExists(path: string): Promise<boolean> {
+  if (!isTauriRuntime()) return true
+  return invoke<boolean>('delete_empty_file_if_exists', { path })
+}
+
 export async function renamePath(oldPath: string, newName: string): Promise<string> {
   if (!isTauriRuntime()) {
     const parent = oldPath.slice(0, oldPath.lastIndexOf('/'))

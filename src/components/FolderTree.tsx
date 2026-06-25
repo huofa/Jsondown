@@ -35,6 +35,9 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
   const activeFileId = useEditorStore((state) => state.activeFileId)
   const openFile = useEditorStore((state) => state.openFile)
   const closeFile = useEditorStore((state) => state.closeFile)
+  const pendingEmptyFile = useEditorStore((state) => state.pendingEmptyFile)
+  const contents = useEditorStore((state) => state.contents)
+  const runAfterPendingCleanup = useEditorStore((state) => state.runAfterPendingCleanup)
   const folders = useRootFolderStore((state) => state.folders)
   const {
     activeFolderId,
@@ -50,6 +53,7 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
   const moveToRecentlyDeleted = useRecentlyDeletedStore((state) => state.moveToRecentlyDeleted)
   const [menu, setMenu] = useState<{ x: number; y: number; node: FileTreeNode } | null>(null)
   const [renameTarget, setRenameTarget] = useState<FileTreeNode | null>(null)
+  const newFileLocked = Boolean(pendingEmptyFile && !(contents[pendingEmptyFile.id] ?? '').trim())
 
   const openFolderMenu = (event: MouseEvent, node: FileTreeNode) => {
     event.preventDefault()
@@ -70,8 +74,10 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
                   className="tree-row tree-folder-row"
                   style={{ paddingLeft: 10 + depth * 14 }}
                   onClick={() => {
-                    selectFolder(node.id)
-                    toggleExpanded(node.id)
+                    void runAfterPendingCleanup(() => {
+                      selectFolder(node.id)
+                      toggleExpanded(node.id)
+                    })
                   }}
                   aria-expanded={expanded}
                 >
@@ -103,8 +109,17 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
             className={`tree-row tree-file ${activeFileId === node.id ? 'is-active' : ''}`}
             style={{ paddingLeft: 27 + depth * 14 }}
             onClick={() => {
-              selectFolder(parentFolderId ?? rootFolderId ?? 'all')
-              openFile(node.id)
+              const openTarget = () => {
+                selectFolder(parentFolderId ?? rootFolderId ?? 'all')
+                openFile(node.id)
+              }
+              if (pendingEmptyFile?.id === node.id) {
+                openTarget()
+                return
+              }
+              void runAfterPendingCleanup(() => {
+                openTarget()
+              })
             }}
             onContextMenu={(event) => openFolderMenu(event, node)}
             title={node.path}
@@ -136,8 +151,7 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
             setMenu(null)
           } : undefined}
           onNewFile={menu.node.kind === 'directory' ? () => {
-            const name = window.prompt('新建文件名称（不写后缀默认 .md）', '新建笔记.md')
-            void createMockFile(menu.node.id, name ?? undefined).then((id) => {
+            void createMockFile(menu.node.id).then((id) => {
               if (id) {
                 openFile(id)
                 showToast(`已在“${menu.node.name}”下新建文件`)
@@ -145,6 +159,8 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
             })
             setMenu(null)
           } : undefined}
+          newFileDisabled={newFileLocked}
+          newFileDisabledTitle="请先输入内容，或切换后自动清理当前空文件"
           onDelete={() => {
             void (async () => {
               const root = folders.find((folder) => folder.id === rootFolderId)

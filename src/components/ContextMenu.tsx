@@ -23,6 +23,8 @@ type ContextMenuProps = {
   onImportFolder?: () => void
   onRefresh?: () => void
   onDelete?: () => void
+  newFileDisabled?: boolean
+  newFileDisabledTitle?: string
   renameLabel?: string
   deleteLabel?: string
 }
@@ -39,6 +41,8 @@ export function ContextMenu({
   onImportFolder,
   onRefresh,
   onDelete,
+  newFileDisabled,
+  newFileDisabledTitle,
   renameLabel = '重命名',
   deleteLabel = '删除入口',
 }: ContextMenuProps) {
@@ -73,7 +77,15 @@ export function ContextMenu({
       {onCopyPath && <button onClick={onCopyPath}><Clipboard size={14} />复制路径</button>}
       {onRename && <button onClick={onRename}><Pencil size={14} />{renameLabel}</button>}
       {onNewFolder && <button onClick={onNewFolder}><FolderPlus size={14} />新建文件夹</button>}
-      {onNewFile && <button onClick={onNewFile}><FilePlus2 size={14} />新建文件</button>}
+      {onNewFile && (
+        <button
+          onClick={onNewFile}
+          disabled={newFileDisabled}
+          title={newFileDisabled ? newFileDisabledTitle : undefined}
+        >
+          <FilePlus2 size={14} />新建文件
+        </button>
+      )}
       {onImportFolder && <button onClick={onImportFolder}><FolderInput size={14} />导入文件夹</button>}
       {onRefresh && <button onClick={onRefresh}><RefreshCw size={14} />刷新全部文件</button>}
       {onDelete && <button className="danger" onClick={onDelete}><Trash2 size={14} />{deleteLabel}</button>}

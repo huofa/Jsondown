@@ -45,6 +45,9 @@ export function RootFolderSidebar() {
   const expandedRootIds = useFileTreeStore((state) => state.expandedRootIds)
   const toggleRootExpanded = useFileTreeStore((state) => state.toggleRootExpanded)
   const openFile = useEditorStore((state) => state.openFile)
+  const pendingEmptyFile = useEditorStore((state) => state.pendingEmptyFile)
+  const contents = useEditorStore((state) => state.contents)
+  const runAfterPendingCleanup = useEditorStore((state) => state.runAfterPendingCleanup)
   const draggedIdRef = useRef<string | null>(null)
   const suppressNextRootClickRef = useRef(false)
   const [draggedId, setDraggedId] = useState<string | null>(null)
@@ -56,6 +59,8 @@ export function RootFolderSidebar() {
   const ordered = useMemo(() => [...folders].sort((a, b) => a.order - b.order), [folders])
   const importTarget = ordered.find((folder) => folder.id === activeFolderId) ?? ordered[0]
   const allFilesCount = ordered.reduce((sum, folder) => sum + flattenFiles(folder.tree ?? [], folder.path).length, 0)
+  const newFileLocked = Boolean(pendingEmptyFile && !(contents[pendingEmptyFile.id] ?? '').trim())
+  const newFileLockedTitle = '请先输入内容，或切换后自动清理当前空文件'
 
   const clearDragState = () => {
     draggedIdRef.current = null
@@ -157,7 +162,9 @@ export function RootFolderSidebar() {
       <div className="sidebar-scroll">
         <div
           className={`system-folder-row all-files-row ${activeFolderId === 'all' ? 'is-active' : ''}`}
-          onClick={() => selectFolder('all')}
+          onClick={() => {
+            void runAfterPendingCleanup(() => selectFolder('all'))
+          }}
         >
           <span className="system-folder-leading-spacer" />
           <span className="system-folder-expand-spacer" />
@@ -216,8 +223,10 @@ export function RootFolderSidebar() {
                   <button
                     className="root-folder-select"
                     onClick={() => {
-                      selectFolder(folder.id)
-                      if (!expanded) toggleRootExpanded(folder.id)
+                      void runAfterPendingCleanup(() => {
+                        selectFolder(folder.id)
+                        if (!expanded) toggleRootExpanded(folder.id)
+                      })
                     }}
                   >
                     <Folder size={15} fill="currentColor" />
@@ -294,8 +303,7 @@ export function RootFolderSidebar() {
             setMenu(null)
           }}
           onNewFile={() => {
-            const name = window.prompt('新建文件名称（不写后缀默认 .md）', '新建笔记.md')
-            void createMockFile(menu.folder.id, name ?? undefined).then((id) => {
+            void createMockFile(menu.folder.id).then((id) => {
               if (id) {
                 openFile(id)
                 showToast(`已在“${menu.folder.name}”下新建文件`)
@@ -303,6 +311,8 @@ export function RootFolderSidebar() {
             })
             setMenu(null)
           }}
+          newFileDisabled={newFileLocked}
+          newFileDisabledTitle={newFileLockedTitle}
           onDelete={() => {
             removeFolder(menu.folder.id)
             showToast('已移除文件夹入口，真实文件未受影响')

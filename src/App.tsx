@@ -16,6 +16,7 @@ export default function App() {
   const activeFolderId = useRootFolderStore((state) => state.activeFolderId)
   const initialize = useRootFolderStore((state) => state.initialize)
   const refreshAllRootFolders = useRootFolderStore((state) => state.refreshAllRootFolders)
+  const refreshRootFolder = useRootFolderStore((state) => state.refreshRootFolder)
   const activeFileId = useEditorStore((state) => state.activeFileId)
   const openFile = useEditorStore((state) => state.openFile)
   const closeFile = useEditorStore((state) => state.closeFile)
@@ -33,6 +34,16 @@ export default function App() {
   useEffect(() => {
     void initialize()
   }, [initialize])
+
+  useEffect(() => {
+    const refreshAfterPendingDelete = (event: Event) => {
+      const detail = (event as CustomEvent<{ rootFolderId?: string }>).detail
+      if (detail?.rootFolderId) void refreshRootFolder(detail.rootFolderId)
+      else void refreshAllRootFolders()
+    }
+    window.addEventListener('jsondown:pending-empty-file-cleared', refreshAfterPendingDelete)
+    return () => window.removeEventListener('jsondown:pending-empty-file-cleared', refreshAfterPendingDelete)
+  }, [refreshAllRootFolders, refreshRootFolder])
 
   useEffect(() => {
     const rootPaths = rootPathsKey ? rootPathsKey.split('\n') : []

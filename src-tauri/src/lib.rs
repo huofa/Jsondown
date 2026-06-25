@@ -4,7 +4,10 @@ mod utils;
 
 use commands::{
     config::{load_app_config, save_app_config},
-    files::{create_file, read_file_preview, read_text_file, rename_path, write_text_file},
+    files::{
+        create_file, create_unique_markdown_file, delete_empty_file_if_exists, read_file_preview,
+        read_text_file, rename_path, write_text_file,
+    },
     finder::reveal_in_finder,
     folders::{
         create_child_folder, create_root_folder, read_directory_tree, select_parent_folder,
@@ -33,6 +36,8 @@ pub fn run() {
             save_app_config,
             create_child_folder,
             create_file,
+            create_unique_markdown_file,
+            delete_empty_file_if_exists,
             rename_path,
             move_to_recently_deleted,
             list_recently_deleted,

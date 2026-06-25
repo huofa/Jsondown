@@ -22,7 +22,7 @@ export function EditorPane() {
   const folders = useRootFolderStore((state) => state.folders)
   const activeFolderId = useRootFolderStore((state) => state.activeFolderId)
   const createMockDocument = useRootFolderStore((state) => state.createMockDocument)
-  const { activeFileId, contents, saveStatus, openFile, updateContent } = useEditorStore()
+  const { activeFileId, contents, pendingEmptyFile, saveStatus, openFile, updateContent } = useEditorStore()
   const loadFileContent = useEditorStore((state) => state.loadFileContent)
   const saveFileContent = useEditorStore((state) => state.saveFileContent)
   const theme = useThemeStore((state) => state.theme)
@@ -36,6 +36,7 @@ export function EditorPane() {
   )
   const file = allFiles.find((item) => item.id === activeFileId)
   const content = activeFileId ? (contents[activeFileId] ?? '') : ''
+  const isNewFileLocked = Boolean(pendingEmptyFile && !(contents[pendingEmptyFile.id] ?? '').trim())
 
   useEffect(() => {
     if (!file) return
@@ -93,7 +94,13 @@ export function EditorPane() {
     <div className={`editor-shell ${theme}`}>
       <header className="editor-header" data-tauri-drag-region onPointerDownCapture={startWindowDrag}>
         <SidebarCollapseButton />
-        <button className="new-document-button" onClick={createDocument} title="新建文档" aria-label="新建文档">
+        <button
+          className="new-document-button"
+          onClick={createDocument}
+          title={isNewFileLocked ? '请先输入内容，或切换后自动清理当前空文件' : '新建文档'}
+          aria-label="新建文档"
+          disabled={isNewFileLocked}
+        >
           <SquarePen size={15} />
         </button>
         <TopEditorToolbar api={editorApi} disabled={!file?.editable} />
@@ -130,6 +137,7 @@ export function EditorPane() {
               <MilkdownEditor
                 key={file.id}
                 value={content}
+                autoFocusStart={pendingEmptyFile?.id === file.id}
                 onReady={setEditorApi}
                 onChange={(markdown) => updateEditorContent(file.id, markdown)}
               />
