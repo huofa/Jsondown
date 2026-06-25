@@ -1,6 +1,9 @@
 import { Crepe, CrepeFeature } from '@milkdown/crepe'
-import { commandsCtx, editorViewCtx, editorViewOptionsCtx } from '@milkdown/kit/core'
+import { commandsCtx, editorViewCtx, editorViewOptionsCtx, remarkStringifyOptionsCtx } from '@milkdown/kit/core'
 import { redoCommand, undoCommand } from '@milkdown/kit/plugin/history'
+import { toggleMark } from '@milkdown/prose/commands'
+import type { Selection } from '@milkdown/prose/state'
+import { $markSchema, $remark } from '@milkdown/utils'
 import {
   insertHrCommand,
   insertImageCommand,
@@ -20,6 +23,134 @@ import {
 import { insertTableCommand, toggleStrikethroughCommand } from '@milkdown/kit/preset/gfm'
 import { useEffect, useRef } from 'react'
 import type { EditorCommand, EditorCommandApi } from '../types/editorCommand'
+
+const HIGHLIGHT_NODE = 'jsondownHighlight'
+
+type MarkdownNode = {
+  type: string
+  value?: string
+  children?: MarkdownNode[]
+  backgroundColor?: string
+  textColor?: string
+  [key: string]: unknown
+}
+
+const normalizeStyleColor = (value: string) => value.trim()
+
+const getSpanHighlightStyle = (value?: string) => {
+  if (!value || !/^<span\b/i.test(value)) return null
+  const styleMatch = value.match(/\sstyle=(["'])(.*?)\1/i)
+  const style = styleMatch?.[2]
+  if (!style) return null
+  const backgroundMatch = style.match(/background-color\s*:\s*([^;]+)/i)
+  if (!backgroundMatch?.[1]) return null
+  const colorMatch = style.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i)
+  return {
+    backgroundColor: normalizeStyleColor(backgroundMatch[1]),
+    textColor: colorMatch?.[1] ? normalizeStyleColor(colorMatch[1]) : undefined,
+  }
+}
+
+const isSpanClose = (value?: string) => Boolean(value && /^<\/span\s*>$/i.test(value.trim()))
+
+const transformHighlightSpans = (node: MarkdownNode) => {
+  if (!node.children) return
+
+  node.children.forEach(transformHighlightSpans)
+  const nextChildren: MarkdownNode[] = []
+  for (let index = 0; index < node.children.length; index += 1) {
+    const child = node.children[index]
+    const highlightStyle = child.type === 'html' ? getSpanHighlightStyle(child.value) : null
+    if (!highlightStyle) {
+      nextChildren.push(child)
+      continue
+    }
+
+    const highlightedChildren: MarkdownNode[] = []
+    let closeIndex = -1
+    for (let inner = index + 1; inner < node.children.length; inner += 1) {
+      const candidate = node.children[inner]
+      if (candidate.type === 'html' && isSpanClose(candidate.value)) {
+        closeIndex = inner
+        break
+      }
+      highlightedChildren.push(candidate)
+    }
+
+    if (closeIndex === -1 || highlightedChildren.length === 0) {
+      nextChildren.push(child)
+      continue
+    }
+
+    nextChildren.push({
+      type: HIGHLIGHT_NODE,
+      backgroundColor: highlightStyle.backgroundColor,
+      textColor: highlightStyle.textColor,
+      children: highlightedChildren,
+    })
+    index = closeIndex
+  }
+  node.children = nextChildren
+}
+
+const jsondownHighlightRemark = $remark('jsondown-highlight-span', () => () => (tree) => {
+  transformHighlightSpans(tree as unknown as MarkdownNode)
+  return tree
+})
+
+const jsondownHighlightSchema = $markSchema('jsondownHighlight', () => ({
+  attrs: {
+    backgroundColor: { default: '#F6E4A6' },
+    textColor: { default: null },
+  },
+  inclusive: true,
+  parseDOM: [
+    {
+      tag: 'span[style]',
+      getAttrs: (dom) => {
+        if (!(dom instanceof HTMLElement)) return false
+        const backgroundColor = dom.style.backgroundColor
+        const textColor = dom.style.color || null
+        return backgroundColor ? { backgroundColor, textColor } : false
+      },
+    },
+  ],
+  toDOM: (mark) => [
+    'span',
+    {
+      'data-jsondown-highlight': 'true',
+      style: [
+        mark.attrs.textColor ? `color: ${mark.attrs.textColor}` : '',
+        `background-color: ${mark.attrs.backgroundColor}`,
+        'border-radius: 0.22em',
+        'box-decoration-break: clone',
+        '-webkit-box-decoration-break: clone',
+        'padding: 0.04em 0.16em',
+      ].filter(Boolean).join('; '),
+    },
+    0,
+  ],
+  parseMarkdown: {
+    match: (node) => node.type === HIGHLIGHT_NODE,
+    runner: (state, node, markType) => {
+      state.openMark(markType, {
+        backgroundColor: node.backgroundColor,
+        textColor: node.textColor,
+      })
+      state.next(node.children)
+      state.closeMark(markType)
+    },
+  },
+  toMarkdown: {
+    match: (mark) => mark.type.name === 'jsondownHighlight',
+    runner: (state, mark) => {
+      state.withMark(mark, HIGHLIGHT_NODE, undefined, {
+        backgroundColor: mark.attrs.backgroundColor,
+        textColor: mark.attrs.textColor,
+      })
+    },
+  },
+}))
 
 type MilkdownEditorProps = {
   value: string
@@ -51,11 +182,32 @@ export function MilkdownEditor({ value, onChange, onReady }: MilkdownEditorProps
         [CrepeFeature.Placeholder]: false,
       },
     })
+    crepe.editor.use([...jsondownHighlightRemark, ...jsondownHighlightSchema])
 
     crepe.editor.config((ctx) => {
       ctx.update(editorViewOptionsCtx, (options) => ({
         ...options,
         handleScrollToSelection: () => true,
+      }))
+      ctx.update(remarkStringifyOptionsCtx, (options) => ({
+        ...options,
+        handlers: {
+          ...options.handlers,
+          [HIGHLIGHT_NODE]: (node: MarkdownNode, _: unknown, state: { containerPhrasing: (node: MarkdownNode, info: unknown) => string }, info: unknown) => {
+            const backgroundColor = typeof node.backgroundColor === 'string'
+              ? node.backgroundColor
+              : '#F6E4A6'
+            const textColor = typeof node.textColor === 'string'
+              ? node.textColor
+              : undefined
+            const style = [
+              textColor ? `color:${textColor}` : '',
+              `background-color:${backgroundColor}`,
+            ].filter(Boolean).join(';')
+            const value = state.containerPhrasing(node, info)
+            return `<span style="${style}">${value}</span>`
+          },
+        },
       }))
     })
 
@@ -65,8 +217,34 @@ export function MilkdownEditor({ value, onChange, onReady }: MilkdownEditorProps
       })
     })
 
+    let rememberedSelection: Selection | null = null
+    const rememberSelection = () =>
+      crepe.editor.action((ctx) => {
+        const selection = ctx.get(editorViewCtx).state.selection
+        if (!selection.empty) {
+          rememberedSelection = selection
+          return true
+        }
+        return Boolean(rememberedSelection && !rememberedSelection.empty)
+      })
+
+    const restoreEditorSelection = (ctx: Parameters<Parameters<typeof crepe.editor.action>[0]>[0]) => {
+      const view = ctx.get(editorViewCtx)
+      const selection = rememberedSelection ?? view.state.selection
+      view.focus()
+      try {
+        if (!view.state.selection.eq(selection)) {
+          view.dispatch(view.state.tr.setSelection(selection))
+        }
+      } catch {
+        rememberedSelection = null
+      }
+      return view
+    }
+
     const run = (command: EditorCommand, payload?: string) =>
       crepe.editor.action((ctx) => {
+        const view = restoreEditorSelection(ctx)
         const commands = ctx.get(commandsCtx)
         let result = false
         switch (command) {
@@ -74,7 +252,13 @@ export function MilkdownEditor({ value, onChange, onReady }: MilkdownEditorProps
           case 'redo': result = commands.call(redoCommand.key); break
           case 'paragraph': result = commands.call(turnIntoTextCommand.key); break
           case 'bold': result = commands.call(toggleStrongCommand.key); break
-          case 'italic': result = commands.call(toggleEmphasisCommand.key); break
+          case 'italic': {
+            const emphasisMark = view.state.schema.marks.emphasis
+            result = emphasisMark
+              ? toggleMark(emphasisMark)(view.state, view.dispatch, view)
+              : commands.call(toggleEmphasisCommand.key)
+            break
+          }
           case 'strikethrough': result = commands.call(toggleStrikethroughCommand.key); break
           case 'inline-code': result = commands.call(toggleInlineCodeCommand.key); break
           case 'bullet-list': result = commands.call(wrapInBulletListCommand.key); break
@@ -92,16 +276,29 @@ export function MilkdownEditor({ value, onChange, onReady }: MilkdownEditorProps
           case 'blockquote': result = commands.call(wrapInBlockquoteCommand.key); break
           case 'hr': result = commands.call(insertHrCommand.key); break
         }
-        ctx.get(editorViewCtx).focus()
+        view.focus()
         return result
       })
 
     const applyColor = (textColor: string, backgroundColor: string) =>
       crepe.editor.action((ctx) => {
-        const view = ctx.get(editorViewCtx)
+        const view = restoreEditorSelection(ctx)
+        if (view.state.selection.empty) return false
+
+        const highlightMark = view.state.schema.marks.jsondownHighlight
+        if (!highlightMark) {
+          if (import.meta.env.DEV) console.warn('[Jsondown] jsondownHighlight mark is not registered')
+          return false
+        }
+
+        const { from, to } = view.state.selection
+        const transaction = view.state.tr
+          .removeMark(from, to, highlightMark)
+          .addMark(from, to, highlightMark.create({ backgroundColor, textColor }))
+          .scrollIntoView()
+        view.dispatch(transaction)
+        rememberedSelection = view.state.selection
         view.focus()
-        document.execCommand('foreColor', false, textColor)
-        document.execCommand('hiliteColor', false, backgroundColor)
         return true
       })
 
@@ -109,9 +306,11 @@ export function MilkdownEditor({ value, onChange, onReady }: MilkdownEditorProps
     void createPromise.then(() => {
       if (disposed) return
       onReadyRef.current?.({
+        rememberSelection,
         run,
           heading: (level) =>
             crepe.editor.action((ctx) => {
+              restoreEditorSelection(ctx)
               const result = level === 0
                 ? ctx.get(commandsCtx).call(turnIntoTextCommand.key)
                 : ctx.get(commandsCtx).call(wrapInHeadingCommand.key, level)

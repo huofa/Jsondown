@@ -46,6 +46,10 @@
 .milkdown-host .ProseMirror li { margin: .28em 0; }
 .milkdown-host .ProseMirror blockquote { margin: 1.4em 0; padding: .15em 0 .15em 1.15em; border-left: 3px solid #ccb78f; color: #766d62; }
 .milkdown-host .ProseMirror a { color: #9c6724; text-decoration-color: rgba(156,103,36,.35); text-underline-offset: 3px; }
+.milkdown-host .ProseMirror em {
+  font-style: oblique 14deg !important;
+  font-synthesis: style;
+}
 .milkdown-host .ProseMirror code { padding: .14em .34em; border-radius: 4px; background: rgba(100,87,68,.08); font: .87em ui-monospace, SFMono-Regular, Menlo, monospace; }
 .milkdown-host .ProseMirror pre { border: 1px solid rgba(70,64,56,.12) !important; border-radius: 8px !important; background: #242527 !important; box-shadow: none !important; }
 .milkdown-host .ProseMirror hr { margin: 2em 0; border: 0; border-top: 1px solid rgba(70,62,52,.13); }
