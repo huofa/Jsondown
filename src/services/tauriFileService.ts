@@ -20,6 +20,17 @@ export type FilePreviewPayload = {
   updatedAt?: string
 }
 
+export type FileChunkResult = {
+  path: string
+  startByte: number
+  endByte: number
+  text: string
+  eof: boolean
+  createdAt?: string
+  updatedAt?: string
+  sizeBytes: number
+}
+
 export type FileWatchPayload = {
   eventType: 'file-created' | 'file-updated' | 'file-deleted' | 'file-renamed'
   paths: string[]
@@ -113,6 +124,28 @@ export async function readFilePreview(
     }
   }
   return invoke<FilePreviewPayload>('read_file_preview', { path, maxBytes, maxLines })
+}
+
+export async function readFileChunk(
+  path: string,
+  startByte = 0,
+  maxBytes = 64 * 1024,
+  fileId?: string,
+): Promise<FileChunkResult> {
+  if (!isTauriRuntime()) {
+    const content = mockFileContents[fileId ?? path] ?? ''
+    const start = Math.max(0, Math.min(startByte, content.length))
+    const end = Math.max(start, Math.min(start + maxBytes, content.length))
+    return {
+      path,
+      startByte: start,
+      endByte: end,
+      text: content.slice(start, end),
+      eof: end >= content.length,
+      sizeBytes: content.length,
+    }
+  }
+  return invoke<FileChunkResult>('read_file_chunk', { path, startByte, maxBytes })
 }
 
 export async function writeTextFile(path: string, content: string): Promise<SaveResult> {

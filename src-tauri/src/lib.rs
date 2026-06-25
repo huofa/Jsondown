@@ -6,7 +6,7 @@ use commands::{
     config::{load_app_config, save_app_config},
     files::{
         create_file, create_unique_markdown_file, delete_empty_file_if_exists, read_file_preview,
-        read_text_file, rename_path, write_text_file,
+        read_file_chunk, read_text_file, rename_path, write_text_file,
     },
     finder::reveal_in_finder,
     folders::{
@@ -29,6 +29,7 @@ pub fn run() {
             create_root_folder,
             read_directory_tree,
             read_file_preview,
+            read_file_chunk,
             read_text_file,
             write_text_file,
             reveal_in_finder,

@@ -1,12 +1,12 @@
 use std::fs;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 use chrono::{Datelike, Local};
 
 use crate::models::file_tree::{FileTreeKind, FileTreeNode};
-use crate::utils::ignore_rules::{extension, is_supported_text_file, should_ignore};
+use crate::utils::ignore_rules::{extension, has_ignored_component, is_supported_text_file, should_ignore};
 use crate::utils::path_utils::{ensure_child_name, file_name as path_file_name, metadata_times, path_to_string};
 
 #[derive(serde::Serialize)]
@@ -27,6 +27,19 @@ pub struct FilePreviewPayload {
     pub updated_at: Option<String>,
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileChunkResult {
+    pub path: String,
+    pub start_byte: u64,
+    pub end_byte: u64,
+    pub text: String,
+    pub eof: bool,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+    pub size_bytes: u64,
+}
+
 fn file_node_from_path(path: &Path) -> FileTreeNode {
     let (created_at, updated_at, size) = metadata_times(path);
     FileTreeNode {
@@ -40,6 +53,26 @@ fn file_node_from_path(path: &Path) -> FileTreeNode {
         created_at,
         size,
     }
+}
+
+fn is_utf8_boundary_byte(byte: u8) -> bool {
+    (byte & 0b1100_0000) != 0b1000_0000
+}
+
+fn next_utf8_boundary(bytes: &[u8], offset: usize) -> usize {
+    let mut index = offset.min(bytes.len());
+    while index < bytes.len() && !is_utf8_boundary_byte(bytes[index]) {
+        index += 1;
+    }
+    index
+}
+
+fn previous_utf8_boundary(bytes: &[u8], offset: usize) -> usize {
+    let mut index = offset.min(bytes.len());
+    while index > 0 && index < bytes.len() && !is_utf8_boundary_byte(bytes[index]) {
+        index -= 1;
+    }
+    index
 }
 
 fn is_image_file(path: &Path) -> bool {
@@ -212,6 +245,58 @@ pub fn read_file_preview(
         summary,
         created_at,
         updated_at,
+    })
+}
+
+#[tauri::command]
+pub fn read_file_chunk(
+    path: String,
+    start_byte: Option<u64>,
+    max_bytes: Option<u64>,
+) -> Result<FileChunkResult, String> {
+    let path_ref = Path::new(&path);
+    if has_ignored_component(path_ref) {
+        return Err("该路径不允许读取".to_string());
+    }
+    if !is_supported_text_file(path_ref) {
+        return Err("不支持读取该文件类型".to_string());
+    }
+
+    let metadata = fs::metadata(path_ref).map_err(|err| err.to_string())?;
+    if !metadata.is_file() {
+        return Err("只能读取文件内容".to_string());
+    }
+
+    let file_size = metadata.len();
+    let requested_start = start_byte.unwrap_or(0).min(file_size);
+    let max_bytes = max_bytes.unwrap_or(64 * 1024).clamp(256, 1024 * 1024);
+    let read_start = requested_start.saturating_sub(3);
+    let desired_offset = (requested_start - read_start) as usize;
+    let read_limit = ((file_size - read_start).min(max_bytes + 8)) as usize;
+
+    let mut file = File::open(path_ref).map_err(|err| err.to_string())?;
+    file.seek(SeekFrom::Start(read_start)).map_err(|err| err.to_string())?;
+    let mut buffer = vec![0; read_limit];
+    let read_count = file.read(&mut buffer).map_err(|err| err.to_string())?;
+    buffer.truncate(read_count);
+
+    let valid_start = next_utf8_boundary(&buffer, desired_offset);
+    let desired_end = desired_offset.saturating_add(max_bytes as usize).min(buffer.len());
+    let valid_end = previous_utf8_boundary(&buffer, desired_end).max(valid_start);
+    let text = String::from_utf8(buffer[valid_start..valid_end].to_vec()).map_err(|err| err.to_string())?;
+    let actual_start = read_start + valid_start as u64;
+    let actual_end = read_start + valid_end as u64;
+    let (created_at, updated_at, _) = metadata_times(path_ref);
+
+    Ok(FileChunkResult {
+        path,
+        start_byte: actual_start,
+        end_byte: actual_end,
+        text,
+        eof: actual_end >= file_size,
+        created_at,
+        updated_at,
+        size_bytes: file_size,
     })
 }
 
