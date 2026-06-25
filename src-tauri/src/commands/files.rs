@@ -25,6 +25,21 @@ pub struct FilePreviewPayload {
     pub updated_at: Option<String>,
 }
 
+fn file_node_from_path(path: &Path) -> FileTreeNode {
+    let (created_at, updated_at, size) = metadata_times(path);
+    FileTreeNode {
+        id: path_to_string(path),
+        name: path_file_name(path),
+        path: path_to_string(path),
+        kind: FileTreeKind::File,
+        extension: extension(path),
+        children: None,
+        updated_at,
+        created_at,
+        size,
+    }
+}
+
 fn is_image_file(path: &Path) -> bool {
     matches!(
         extension(path).as_deref(),
@@ -221,18 +236,53 @@ pub fn create_file(parent_path: String, file_name: String) -> Result<FileTreeNod
         return Err("同名文件已存在".to_string());
     }
     fs::write(&path, "").map_err(|err| err.to_string())?;
-    let (created_at, updated_at, size) = metadata_times(&path);
-    Ok(FileTreeNode {
-        id: path_to_string(&path),
-        name: path_file_name(&path),
-        path: path_to_string(&path),
-        kind: FileTreeKind::File,
-        extension: extension(&path),
-        children: None,
-        updated_at,
-        created_at,
-        size,
-    })
+    Ok(file_node_from_path(&path))
+}
+
+#[tauri::command]
+pub fn create_unique_markdown_file(parent_path: String) -> Result<FileTreeNode, String> {
+    let parent = Path::new(&parent_path);
+    if !parent.exists() || !parent.is_dir() {
+        return Err("目标文件夹不存在".to_string());
+    }
+
+    for index in 0..10_000 {
+        let stem = if index == 0 {
+            "新建文件".to_string()
+        } else {
+            format!("新建文件{}", index)
+        };
+        let name = format!("{}.md", stem);
+        let path = parent.join(name);
+        let same_stem_path = parent.join(stem);
+        if path.exists() || same_stem_path.exists() {
+            continue;
+        }
+        fs::write(&path, "").map_err(|err| err.to_string())?;
+        return Ok(file_node_from_path(&path));
+    }
+
+    Err("无法生成可用的新建文件名".to_string())
+}
+
+#[tauri::command]
+pub fn delete_empty_file_if_exists(path: String) -> Result<bool, String> {
+    let path = Path::new(&path);
+    if !path.exists() {
+        return Ok(false);
+    }
+    if !path.is_file() {
+        return Err("只能清理空文件，不能删除文件夹".to_string());
+    }
+    if should_ignore(path) {
+        return Err("该路径不允许删除".to_string());
+    }
+    let content = fs::read_to_string(path).map_err(|err| err.to_string())?;
+    if !content.trim().is_empty() {
+        return Ok(false);
+    }
+    fs::remove_file(path).map_err(|err| err.to_string())?;
+    Ok(true)
 }
 
 #[tauri::command]

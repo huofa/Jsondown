@@ -1,15 +1,19 @@
 import { Trash2 } from 'lucide-react'
+import { useEditorStore } from '../stores/editorStore'
 import { useRecentlyDeletedStore } from '../stores/recentlyDeletedStore'
 import { useRootFolderStore } from '../stores/rootFolderStore'
 
 export function RecentlyDeletedEntry() {
   const selected = useRootFolderStore((state) => state.activeFolderId) === 'recently-deleted'
   const selectFolder = useRootFolderStore((state) => state.selectFolder)
+  const runAfterPendingCleanup = useEditorStore((state) => state.runAfterPendingCleanup)
   const count = useRecentlyDeletedStore((state) => state.recentlyDeletedFiles.length)
   return (
     <button
       className={`system-folder-row recently-deleted-entry ${selected ? 'is-active' : ''}`}
-      onClick={() => selectFolder('recently-deleted')}
+      onClick={() => {
+        void runAfterPendingCleanup(() => selectFolder('recently-deleted'))
+      }}
     >
       <span className="recently-deleted-drag-spacer" />
       <span className="system-folder-expand-spacer" />

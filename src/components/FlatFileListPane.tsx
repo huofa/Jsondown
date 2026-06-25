@@ -45,6 +45,8 @@ export function FlatFileListPane() {
   const { query, sortMode, setQuery, setSortMode } = useFileListStore()
   const activeFileId = useEditorStore((state) => state.activeFileId)
   const openFile = useEditorStore((state) => state.openFile)
+  const pendingEmptyFile = useEditorStore((state) => state.pendingEmptyFile)
+  const runAfterPendingCleanup = useEditorStore((state) => state.runAfterPendingCleanup)
   const removeContent = useEditorStore((state) => state.removeContent)
   const closeFile = useEditorStore((state) => state.closeFile)
   const previews = useFilePreviewStore((state) => state.previews)
@@ -209,8 +211,17 @@ export function FlatFileListPane() {
                     selected={activeFileId === file.id}
                     showParentFolder={isAllFiles}
                     onOpen={() => {
-                      if (!isAllFiles && file.rootFolderId) selectFolder(activeFolderId ?? file.rootFolderId)
-                      openFile(file.id)
+                      const openTarget = () => {
+                        if (!isAllFiles && file.rootFolderId) selectFolder(activeFolderId ?? file.rootFolderId)
+                        openFile(file.id)
+                      }
+                      if (pendingEmptyFile?.id === file.id) {
+                        openTarget()
+                        return
+                      }
+                      void runAfterPendingCleanup(() => {
+                        openTarget()
+                      })
                     }}
                     onContextMenu={(event) => openMenu(event, file)}
                   />

@@ -2,7 +2,7 @@ import { Crepe, CrepeFeature } from '@milkdown/crepe'
 import { commandsCtx, editorViewCtx, editorViewOptionsCtx, remarkStringifyOptionsCtx } from '@milkdown/kit/core'
 import { redoCommand, undoCommand } from '@milkdown/kit/plugin/history'
 import { toggleMark } from '@milkdown/prose/commands'
-import type { Selection } from '@milkdown/prose/state'
+import { TextSelection, type Selection } from '@milkdown/prose/state'
 import { $markSchema, $remark } from '@milkdown/utils'
 import {
   insertHrCommand,
@@ -154,11 +154,12 @@ const jsondownHighlightSchema = $markSchema('jsondownHighlight', () => ({
 
 type MilkdownEditorProps = {
   value: string
+  autoFocusStart?: boolean
   onChange: (markdown: string) => void
   onReady?: (api: EditorCommandApi | null) => void
 }
 
-export function MilkdownEditor({ value, onChange, onReady }: MilkdownEditorProps) {
+export function MilkdownEditor({ value, autoFocusStart, onChange, onReady }: MilkdownEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const onChangeRef = useRef(onChange)
   const onReadyRef = useRef(onReady)
@@ -319,6 +320,15 @@ export function MilkdownEditor({ value, onChange, onReady }: MilkdownEditorProps
             }),
           applyColor,
       })
+      if (autoFocusStart) {
+        crepe.editor.action((ctx) => {
+          const view = ctx.get(editorViewCtx)
+          const start = Math.min(1, view.state.doc.content.size)
+          view.focus()
+          view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, start)))
+          return true
+        })
+      }
     })
 
     return () => {

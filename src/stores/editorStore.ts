@@ -1,17 +1,33 @@
 import { create } from 'zustand'
 import type { SaveStatus } from '../types/editor'
-import { isTauriRuntime, readTextFile, writeTextFile } from '../services/tauriFileService'
+import {
+  deleteEmptyFileIfExists,
+  isTauriRuntime,
+  readTextFile,
+  writeTextFile,
+} from '../services/tauriFileService'
 import { mockFileContents } from '../utils/mockFileSystem'
+
+export type PendingEmptyFile = {
+  id: string
+  path: string
+  rootFolderId?: string
+}
 
 type EditorState = {
   activeFileId: string | null
   contents: Record<string, string>
   loadedPaths: Record<string, string>
   savedContents: Record<string, string>
+  pendingEmptyFile: PendingEmptyFile | null
   saveStatus: SaveStatus
   savedAt: string | null
   openFile: (id: string) => void
   closeFile: () => void
+  markPendingEmptyFile: (file: PendingEmptyFile) => void
+  clearPendingEmptyFile: () => void
+  discardPendingEmptyFile: () => Promise<boolean>
+  runAfterPendingCleanup: (nextAction: () => void | Promise<void>) => Promise<void>
   loadFileContent: (id: string, path: string, kind?: string) => Promise<void>
   saveFileContent: (id: string, path: string) => Promise<void>
   updateContent: (id: string, content: string) => void
@@ -26,10 +42,68 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   contents: { ...mockFileContents },
   loadedPaths: {},
   savedContents: { ...mockFileContents },
+  pendingEmptyFile: null,
   saveStatus: 'idle',
   savedAt: null,
   openFile: (id) => set({ activeFileId: id, saveStatus: 'idle', savedAt: null }),
   closeFile: () => set({ activeFileId: null, saveStatus: 'idle', savedAt: null }),
+  markPendingEmptyFile: (file) =>
+    set((state) => ({
+      pendingEmptyFile: file,
+      contents: { ...state.contents, [file.id]: '' },
+      savedContents: { ...state.savedContents, [file.id]: '' },
+      loadedPaths: { ...state.loadedPaths, [file.id]: file.path },
+      saveStatus: state.activeFileId === file.id ? 'idle' : state.saveStatus,
+    })),
+  clearPendingEmptyFile: () => set({ pendingEmptyFile: null }),
+  discardPendingEmptyFile: async () => {
+    const pending = get().pendingEmptyFile
+    if (!pending) return false
+
+    const content = get().contents[pending.id] ?? ''
+    if (content.trim()) {
+      set({ pendingEmptyFile: null })
+      return false
+    }
+
+    set((state) => {
+      const contents = { ...state.contents }
+      const savedContents = { ...state.savedContents }
+      const loadedPaths = { ...state.loadedPaths }
+      delete contents[pending.id]
+      delete savedContents[pending.id]
+      delete loadedPaths[pending.id]
+      return {
+        contents,
+        savedContents,
+        loadedPaths,
+        pendingEmptyFile: null,
+        activeFileId: state.activeFileId === pending.id ? null : state.activeFileId,
+        saveStatus: state.activeFileId === pending.id ? 'idle' : state.saveStatus,
+      }
+    })
+
+    let deleted = true
+    try {
+      deleted = await deleteEmptyFileIfExists(pending.path)
+    } catch {
+      deleted = false
+    }
+    window.dispatchEvent(new CustomEvent('jsondown:pending-empty-file-cleared', {
+      detail: { ...pending, deleted },
+    }))
+    return deleted
+  },
+  runAfterPendingCleanup: async (nextAction) => {
+    try {
+      await get().discardPendingEmptyFile()
+    } catch (error) {
+      if (import.meta.env.DEV) console.warn('[Jsondown] pending empty file cleanup failed', error)
+      set({ pendingEmptyFile: null })
+    } finally {
+      await nextAction()
+    }
+  },
   loadFileContent: async (id, path, kind) => {
     if (kind === 'image') {
       set((state) => ({
@@ -72,9 +146,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   updateContent: (id, content) =>
     set((state) => {
       if (state.contents[id] === content) return state
+      const pendingIsNowFormal = state.pendingEmptyFile?.id === id && Boolean(content.trim())
+      const pendingStillEmpty = state.pendingEmptyFile?.id === id && !content.trim()
       return {
         contents: { ...state.contents, [id]: content },
-        saveStatus: 'dirty',
+        pendingEmptyFile: pendingIsNowFormal ? null : state.pendingEmptyFile,
+        saveStatus: pendingStillEmpty ? state.saveStatus : 'dirty',
       }
     }),
   addContent: (id, content) =>
