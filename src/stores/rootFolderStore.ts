@@ -46,18 +46,27 @@ const uniqueId = (prefix: string) => `${prefix}-${Date.now()}-${Math.round(Math.
 const extensionFor = (name: string) => normalizeExtension(name || '未命名.md') || 'md'
 
 const fileNameFor = (name?: string) => {
-  const trimmed = name?.trim() || '新建文件'
+  const trimmed = name?.trim() || defaultMarkdownNoteStem()
   return trimmed.includes('.') ? trimmed : `${trimmed}.md`
+}
+
+const defaultMarkdownNoteStem = (date = new Date()) => {
+  const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}年${month}月${day}日${weekdays[date.getDay()]}`
 }
 
 const uniqueMarkdownFileName = (siblings: FileTreeNode[]) => {
   const existing = new Set(siblings.map((node) => node.name))
+  const baseStem = defaultMarkdownNoteStem()
   for (let index = 0; index < 10_000; index += 1) {
-    const stem = index === 0 ? '新建文件' : `新建文件${index}`
+    const stem = index === 0 ? baseStem : `${baseStem}-${index}`
     const name = `${stem}.md`
     if (!existing.has(name) && !existing.has(stem)) return name
   }
-  return `新建文件-${Date.now()}.md`
+  return `${baseStem}-${Date.now()}.md`
 }
 
 const renameFileNameFor = (currentName: string, nextName: string) => {
