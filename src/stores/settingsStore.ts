@@ -2,11 +2,11 @@ import { create } from 'zustand'
 import type { CustomEditorLayout, LayoutDensity } from '../types/settings'
 
 export const defaultCustomEditorLayout: CustomEditorLayout = {
-  fontSize: 14,
-  lineHeight: 1.6,
-  paragraphSpacing: 6,
-  letterSpacing: 0,
-  horizontalPadding: 22,
+  fontSize: 13,
+  lineHeight: 0.6,
+  paragraphSpacing: -2,
+  letterSpacing: -0.2,
+  horizontalPadding: 18,
 }
 
 type SettingsState = {

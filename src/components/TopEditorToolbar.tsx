@@ -127,12 +127,10 @@ export function TopEditorToolbar({ api, disabled }: TopEditorToolbarProps) {
           onChange={(event) => api?.heading(Number(event.target.value))}
         >
           <option value="0">正文</option>
-          <option value="1">标题 1</option>
-          <option value="2">标题 2</option>
-          <option value="3">标题 3</option>
-          <option value="4">标题 4</option>
-          <option value="5">标题 5</option>
-          <option value="6">标题 6</option>
+          <option value="1">主标题</option>
+          <option value="2">大标题</option>
+          <option value="3">小标题</option>
+          <option value="4">副标题</option>
         </select>
         <div className="toolbar-separator" />
         <div className="toolbar-group">
