@@ -52,6 +52,7 @@ const colorPresets = [
 export function TopEditorToolbar({ api, disabled }: TopEditorToolbarProps) {
   const [colorOpen, setColorOpen] = useState(false)
   const [colorMenuPosition, setColorMenuPosition] = useState({ left: 0, top: 0 })
+  const [headingSelectValue, setHeadingSelectValue] = useState('')
   const colorButtonRef = useRef<HTMLButtonElement>(null)
   const isDisabled = disabled || !api
   const run = (command: EditorCommand) => api?.run(command)
@@ -121,11 +122,17 @@ export function TopEditorToolbar({ api, disabled }: TopEditorToolbarProps) {
         <select
           className="heading-select"
           disabled={isDisabled}
-          defaultValue="0"
+          value={headingSelectValue}
           title="段落样式"
           aria-label="段落样式"
-          onChange={(event) => api?.heading(Number(event.target.value))}
+          onMouseDown={() => api?.rememberSelection()}
+          onChange={(event) => {
+            const level = Number(event.target.value)
+            api?.heading(level)
+            setHeadingSelectValue('')
+          }}
         >
+          <option value="" disabled>格式</option>
           <option value="0">正文</option>
           <option value="1">主标题</option>
           <option value="2">大标题</option>
