@@ -6,6 +6,9 @@ import {
   readTextFile,
   writeTextFile,
 } from '../services/tauriFileService'
+import { useFilePreviewStore } from './filePreviewStore'
+import { useOpenedFileCacheStore } from './openedFileCacheStore'
+import type { EditableFile } from '../types/file'
 import { mockFileContents } from '../utils/mockFileSystem'
 
 export type PendingEmptyFile = {
@@ -23,13 +26,14 @@ type EditorState = {
   saveStatus: SaveStatus
   savedAt: string | null
   openFile: (id: string) => void
+  requestOpenFile: (nextId: string, files: EditableFile[]) => Promise<boolean>
   closeFile: () => void
   markPendingEmptyFile: (file: PendingEmptyFile) => void
   clearPendingEmptyFile: () => void
   discardPendingEmptyFile: () => Promise<boolean>
   runAfterPendingCleanup: (nextAction: () => void | Promise<void>) => Promise<void>
   loadFileContent: (id: string, path: string, kind?: string) => Promise<void>
-  saveFileContent: (id: string, path: string) => Promise<void>
+  saveFileContent: (id: string, path: string) => Promise<boolean>
   updateContent: (id: string, content: string) => void
   addContent: (id: string, content: string) => void
   removeContent: (id: string) => void
@@ -45,7 +49,42 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   pendingEmptyFile: null,
   saveStatus: 'idle',
   savedAt: null,
-  openFile: (id) => set({ activeFileId: id, saveStatus: 'idle', savedAt: null }),
+  openFile: (id) => {
+    const content = get().contents[id]
+    const savedContent = get().savedContents[id]
+    set({
+      activeFileId: id,
+      saveStatus: content !== undefined && savedContent !== undefined && content !== savedContent ? 'dirty' : 'idle',
+      savedAt: null,
+    })
+  },
+  requestOpenFile: async (nextId, files) => {
+    const state = get()
+    const currentId = state.activeFileId
+    if (import.meta.env.DEV) console.debug('[open:request]', { currentId, nextId, saveStatus: state.saveStatus })
+
+    if (currentId && currentId !== nextId) {
+      const currentFile = files.find((file) => file.id === currentId || file.path === currentId)
+      const currentContent = state.contents[currentId] ?? ''
+      const savedContent = state.savedContents[currentId] ?? ''
+      if (currentFile?.editable && currentContent !== savedContent) {
+        if (import.meta.env.DEV) {
+          console.debug('[open:flush-before-switch]', {
+            currentId,
+            path: currentFile.path,
+            bytes: new Blob([currentContent]).size,
+            preview: currentContent.slice(0, 80),
+          })
+        }
+        const ok = await get().saveFileContent(currentId, currentFile.path)
+        if (!ok) return false
+      }
+    }
+
+    if (import.meta.env.DEV) console.debug('[open:commit]', { nextId })
+    get().openFile(nextId)
+    return true
+  },
   closeFile: () => set({ activeFileId: null, saveStatus: 'idle', savedAt: null }),
   markPendingEmptyFile: (file) =>
     set((state) => ({
@@ -129,18 +168,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const content = get().contents[id] ?? ''
     if (content === get().savedContents[id]) {
       set({ saveStatus: 'saved', savedAt: new Date().toISOString() })
-      return
+      return true
     }
     try {
       set({ saveStatus: 'saving' })
+      if (import.meta.env.DEV) {
+        console.debug('[save:start]', {
+          id,
+          path,
+          bytes: new Blob([content]).size,
+          preview: content.slice(0, 80),
+        })
+      }
       const result = await writeTextFile(path, content)
       set((state) => ({
         saveStatus: result.ok ? 'saved' : 'error',
         savedAt: result.savedAt,
         savedContents: result.ok ? { ...state.savedContents, [id]: content } : state.savedContents,
       }))
+      if (result.ok) {
+        useOpenedFileCacheStore.getState().invalidatePath(path)
+        useFilePreviewStore.getState().removePreview(path)
+        window.dispatchEvent(new CustomEvent('jsondown:file-saved', {
+          detail: { path, updatedAt: result.updatedAt ?? result.savedAt, size: content.length },
+        }))
+        if (import.meta.env.DEV) console.debug('[save:success]', { id, path, updatedAt: result.updatedAt })
+      }
+      return result.ok
     } catch {
       set({ saveStatus: 'error' })
+      return false
     }
   },
   updateContent: (id, content) =>
@@ -148,6 +205,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (state.contents[id] === content) return state
       const pendingIsNowFormal = state.pendingEmptyFile?.id === id && Boolean(content.trim())
       const pendingStillEmpty = state.pendingEmptyFile?.id === id && !content.trim()
+      if (pendingIsNowFormal && import.meta.env.DEV) {
+        console.debug('[new-file:formalized-keep-editing]', { id, path: state.pendingEmptyFile?.path })
+      }
       return {
         contents: { ...state.contents, [id]: content },
         pendingEmptyFile: pendingIsNowFormal ? null : state.pendingEmptyFile,

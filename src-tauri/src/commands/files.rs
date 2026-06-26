@@ -104,8 +104,55 @@ fn default_note_stem_for_today() -> String {
     format!("{:04}年{:02}月{:02}日{}", now.year(), now.month(), now.day(), weekday)
 }
 
+fn decode_basic_html_entities(text: &str) -> String {
+    text.replace("&nbsp;", " ")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&amp;", "&")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+}
+
+fn strip_inline_html_for_preview(text: &str) -> String {
+    let mut result = String::new();
+    let chars: Vec<char> = text.chars().collect();
+    let mut index = 0;
+
+    while index < chars.len() {
+        if chars[index] == '<' {
+            let mut end = index + 1;
+            while end < chars.len() && chars[end] != '>' {
+                end += 1;
+            }
+            if end < chars.len() {
+                let tag: String = chars[index + 1..end].iter().collect();
+                let tag_name = tag
+                    .trim()
+                    .trim_start_matches('/')
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("")
+                    .trim_end_matches('/')
+                    .to_ascii_lowercase();
+                if tag_name == "br" {
+                    result.push(' ');
+                } else if tag_name == "img" {
+                    result.push_str(" [图片] ");
+                }
+                index = end + 1;
+                continue;
+            }
+        }
+
+        result.push(chars[index]);
+        index += 1;
+    }
+
+    decode_basic_html_entities(&result)
+}
+
 fn strip_markdown_line(line: &str) -> String {
-    let mut text = line.trim().to_string();
+    let mut text = strip_inline_html_for_preview(line).trim().to_string();
     text = text
         .trim_start_matches('#')
         .trim_start_matches('>')

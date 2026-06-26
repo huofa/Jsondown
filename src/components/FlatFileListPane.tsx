@@ -46,7 +46,7 @@ export function FlatFileListPane() {
   const selectFolder = useRootFolderStore((state) => state.selectFolder)
   const { query, sortMode, setQuery, setSortMode } = useFileListStore()
   const activeFileId = useEditorStore((state) => state.activeFileId)
-  const openFile = useEditorStore((state) => state.openFile)
+  const requestOpenFile = useEditorStore((state) => state.requestOpenFile)
   const pendingEmptyFile = useEditorStore((state) => state.pendingEmptyFile)
   const runAfterPendingCleanup = useEditorStore((state) => state.runAfterPendingCleanup)
   const removeContent = useEditorStore((state) => state.removeContent)
@@ -69,11 +69,15 @@ export function FlatFileListPane() {
   const isAllFiles = activeFolderId === 'all'
   const isRecentlyDeleted = activeFolderId === 'recently-deleted'
   const title = isAllFiles ? '全部文件' : isRecentlyDeleted ? '最近删除' : (selectedFolder?.name ?? '未选择资料夹')
+  const allFiles = useMemo(
+    () => folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id)),
+    [folders],
+  )
 
   const files = useMemo(() => {
     if (isRecentlyDeleted) return []
     const source = isAllFiles
-      ? folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id))
+      ? allFiles
       : getDirectFilesForSelection(folders, activeFolderId)
     const needle = query.trim().toLocaleLowerCase()
     return source
@@ -94,7 +98,7 @@ export function FlatFileListPane() {
         if (sortMode === 'name-desc') return b.name.localeCompare(a.name, 'zh-CN')
         return a.name.localeCompare(b.name, 'zh-CN')
       })
-  }, [activeFolderId, folders, getPreviewKey, isAllFiles, isRecentlyDeleted, previews, query, sortMode])
+  }, [activeFolderId, allFiles, folders, getPreviewKey, isAllFiles, isRecentlyDeleted, previews, query, sortMode])
 
   useEffect(() => {
     if (isRecentlyDeleted) return
@@ -216,7 +220,7 @@ export function FlatFileListPane() {
                     onOpen={() => {
                       const openTarget = () => {
                         if (!isAllFiles && file.rootFolderId) selectFolder(activeFolderId ?? file.rootFolderId)
-                        openFile(file.id)
+                        void requestOpenFile(file.id, allFiles)
                       }
                       if (pendingEmptyFile?.id === file.id) {
                         openTarget()
@@ -307,7 +311,7 @@ export function FlatFileListPane() {
           const nextId = await renameFile(renameTarget.path, name)
           if (nextId && activeFileId === renameTarget.id) {
             removeContent(renameTarget.id)
-            openFile(nextId)
+            void requestOpenFile(nextId, allFiles)
           }
           showToast('已重命名文件')
         }}

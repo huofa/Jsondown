@@ -86,9 +86,22 @@ export async function readTextFile(path: string, fileId?: string): Promise<strin
   return invoke<string>('read_text_file', { path })
 }
 
-function stripMarkdownPreview(content: string) {
+export function stripMarkdownPreview(content: string) {
   const lines = content
     .replace(/```[\s\S]*?```/g, '\n')
+    .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<span\b[^>]*>([\s\S]*?)<\/span>/gi, '$1')
+    .replace(/<a\b[^>]*>([\s\S]*?)<\/a>/gi, '$1')
+    .replace(/<img\b[^>]*>/gi, ' [图片] ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
     .replace(/!\[[^\]]*]\([^)]*\)/g, ' ')
     .replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
     .split(/\n+/)

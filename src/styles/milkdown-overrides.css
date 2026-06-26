@@ -1,3 +1,9 @@
+.milkdown-mode-shell.is-readonly,
+.milkdown-host.is-readonly,
+.milkdown-host.is-readonly .ProseMirror {
+  cursor: text;
+}
+
 .milkdown-host, .milkdown-host .milkdown { min-height: 0; color: inherit; background: transparent !important; }
 .milkdown-host .milkdown { border: 0 !important; box-shadow: none !important; }
 

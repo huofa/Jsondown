@@ -18,7 +18,7 @@ export default function App() {
   const refreshAllRootFolders = useRootFolderStore((state) => state.refreshAllRootFolders)
   const refreshRootFolder = useRootFolderStore((state) => state.refreshRootFolder)
   const activeFileId = useEditorStore((state) => state.activeFileId)
-  const openFile = useEditorStore((state) => state.openFile)
+  const requestOpenFile = useEditorStore((state) => state.requestOpenFile)
   const closeFile = useEditorStore((state) => state.closeFile)
   const setSaveStatus = useEditorStore((state) => state.setSaveStatus)
   const layoutDensity = useSettingsStore((state) => state.layoutDensity)
@@ -80,10 +80,10 @@ export default function App() {
       : getDirectFilesForSelection(folders, activeFolderId)
     if (!files.some((file) => file.id === activeFileId)) {
       const firstMarkdown = files.find((file) => file.editable) ?? files[0]
-      if (firstMarkdown) openFile(firstMarkdown.id)
+      if (firstMarkdown) void requestOpenFile(firstMarkdown.id, folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id)))
       else closeFile()
     }
-  }, [activeFileId, activeFolderId, closeFile, folders, openFile])
+  }, [activeFileId, activeFolderId, closeFile, folders, requestOpenFile])
 
   return (
     <div

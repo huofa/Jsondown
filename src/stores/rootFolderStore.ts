@@ -38,6 +38,7 @@ type RootFolderState = {
   removeTreeNode: (id: string) => void
   restoreFile: (rootFolderId: string, parentId: string | undefined, node: FileTreeNode) => void
   selectFolder: (id: string) => void
+  updateFileMetadata: (path: string, metadata: Pick<FileTreeNode, 'updatedAt' | 'size'>) => void
   reorderFolders: (sourceId: string, targetId: string, position?: 'before' | 'after') => void
 }
 
@@ -429,6 +430,23 @@ export const useRootFolderStore = create<RootFolderState>((set, get) => ({
       }
     }),
   selectFolder: (id) => set({ activeFolderId: id }),
+  updateFileMetadata: (path, metadata) =>
+    set((state) => {
+      const updateNodes = (nodes: FileTreeNode[]): FileTreeNode[] =>
+        nodes.map((node) => {
+          if (node.path === path && node.kind === 'file') {
+            return {
+              ...node,
+              updatedAt: metadata.updatedAt ?? node.updatedAt,
+              size: metadata.size ?? node.size,
+            }
+          }
+          return node.children ? { ...node, children: updateNodes(node.children) } : node
+        })
+      return {
+        folders: state.folders.map((folder) => ({ ...folder, tree: updateNodes(folder.tree ?? []) })),
+      }
+    }),
   reorderFolders: (sourceId, targetId, position = 'before') =>
     set((state) => {
       const folders = [...state.folders].sort((a, b) => a.order - b.order)
@@ -444,3 +462,14 @@ export const useRootFolderStore = create<RootFolderState>((set, get) => ({
       return { folders: ordered }
     }),
 }))
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('jsondown:file-saved', (event) => {
+    const detail = (event as CustomEvent<{ path?: string; updatedAt?: string; size?: number }>).detail
+    if (!detail?.path) return
+    useRootFolderStore.getState().updateFileMetadata(detail.path, {
+      updatedAt: detail.updatedAt,
+      size: detail.size,
+    })
+  })
+}
