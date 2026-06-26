@@ -37,6 +37,53 @@ type MarkdownNode = {
 }
 
 const normalizeStyleColor = (value: string) => value.trim()
+const standaloneBrLinePattern = /^\s*<br\s*\/?>\s*$/i
+const fenceLinePattern = /^\s*(```|~~~)/
+const emptySpanPattern = /<span\s+style=(["'])(?:(?!\1).)*\1>\s*<\/span>/gi
+const hasEmptySpan = (markdown: string) =>
+  /<span\s+style=(["'])(?:(?!\1).)*\1>\s*<\/span>/i.test(markdown)
+
+const normalizeMarkdownFirstOutput = (markdown: string) => {
+  const lines = markdown.replace(emptySpanPattern, '').split('\n')
+  const normalizedLines: string[] = []
+  let inFence = false
+  let blankRun = 0
+
+  for (const line of lines) {
+    if (fenceLinePattern.test(line)) {
+      inFence = !inFence
+      normalizedLines.push(line)
+      blankRun = 0
+      continue
+    }
+
+    const nextLine = !inFence && standaloneBrLinePattern.test(line) ? '' : line
+
+    if (!inFence && nextLine.trim() === '') {
+      blankRun += 1
+      if (blankRun <= 2) normalizedLines.push('')
+      continue
+    }
+
+    blankRun = 0
+    normalizedLines.push(nextLine)
+  }
+
+  return normalizedLines.join('\n')
+}
+
+const logMarkdownPreview = (markdown: string) => {
+  if (!import.meta.env.DEV) return
+  console.debug('[markdown:updated-preview]', {
+    hasBr: /<br\s*\/?>/i.test(markdown),
+    hasSpanStyle: /<span\s+style=/i.test(markdown),
+    hasEmptySpan: hasEmptySpan(markdown),
+    hasEscapedOrderedList: /^\s*\d+\\\./m.test(markdown),
+    hasEscapedBulletList: /^\s*\\[*+-]\s+/m.test(markdown),
+    hasEscapedUnderscore: /\\_/.test(markdown),
+    preview: markdown.slice(0, 500),
+  })
+}
 
 const getSpanHighlightStyle = (value?: string) => {
   if (!value || !/^<span\b/i.test(value)) return null
@@ -212,15 +259,22 @@ export function MilkdownEditor({ value, autoFocusStart, readOnly = false, onChan
               `background-color:${backgroundColor}`,
             ].filter(Boolean).join(';')
             const value = state.containerPhrasing(node, info)
+            if (!value) return ''
+            if (!value.trim()) return value
             return `<span style="${style}">${value}</span>`
           },
+          break: () => '\n',
+          hardBreak: () => '\n',
         },
       }))
     })
 
     crepe.on((listener) => {
       listener.markdownUpdated((_ctx, markdown, previousMarkdown) => {
-        if (!readOnlyRef.current && !disposed && markdown !== previousMarkdown) onChangeRef.current(markdown)
+        if (readOnlyRef.current || disposed || markdown === previousMarkdown) return
+        const normalizedMarkdown = normalizeMarkdownFirstOutput(markdown)
+        logMarkdownPreview(normalizedMarkdown)
+        onChangeRef.current(normalizedMarkdown)
       })
     })
 
@@ -302,6 +356,7 @@ export function MilkdownEditor({ value, autoFocusStart, readOnly = false, onChan
         const transaction = view.state.tr
           .removeMark(from, to, highlightMark)
           .addMark(from, to, highlightMark.create({ backgroundColor, textColor }))
+          .removeStoredMark(highlightMark)
           .scrollIntoView()
         view.dispatch(transaction)
         rememberedSelection = view.state.selection
