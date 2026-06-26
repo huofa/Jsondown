@@ -37,7 +37,7 @@ export function LayoutDensitySwitcher() {
               字号 <span>{customEditorLayout.fontSize}px</span>
               <input
                 type="range"
-                min="14"
+                min="0"
                 max="24"
                 step="1"
                 value={customEditorLayout.fontSize}
@@ -48,7 +48,7 @@ export function LayoutDensitySwitcher() {
               行高 <span>{customEditorLayout.lineHeight.toFixed(2)}</span>
               <input
                 type="range"
-                min="1.25"
+                min="0.85"
                 max="2.35"
                 step="0.05"
                 value={customEditorLayout.lineHeight}
@@ -56,12 +56,12 @@ export function LayoutDensitySwitcher() {
               />
             </label>
             <label>
-              上下间距 <span>{customEditorLayout.paragraphSpacing}px</span>
+              上下间距 <span>{customEditorLayout.paragraphSpacing.toFixed(1)}px</span>
               <input
                 type="range"
-                min="0"
-                max="36"
-                step="1"
+                min="-14"
+                max="28"
+                step="0.5"
                 value={customEditorLayout.paragraphSpacing}
                 onChange={(event) => setCustomEditorLayout({ paragraphSpacing: Number(event.target.value) })}
               />

@@ -4,20 +4,63 @@
   cursor: text;
 }
 
-.milkdown-host, .milkdown-host .milkdown { min-height: 0; color: inherit; background: transparent !important; }
+.milkdown-host,
+.milkdown-host .milkdown {
+  /* 列表上下距离统一调节区：
+     1) block：列表整体与上下正文距离，影响有序/无序/任务列表
+     2) row：列表每一行自身上下距离，影响有序/无序/任务列表
+     3) task-adjacent：两个独立任务项之间距离，专门补偿点击任务按钮生成的结构 */
+  --jd-list-block-margin-top: 0.55em;
+  --jd-list-block-margin-bottom: 0.1em;
+  --jd-list-row-margin-top: -0.5em;
+  --jd-list-row-margin-bottom: 0.02em;
+  --jd-list-task-adjacent-margin-y: -0.18em;
+  --crepe-color-on-background: #000000;
+  --crepe-color-on-surface: #050505;
+  --crepe-color-on-surface-variant: #000000;
+  min-height: 0;
+  color: #000000 !important;
+  background: transparent !important;
+}
 .milkdown-host .milkdown { border: 0 !important; box-shadow: none !important; }
 
 .milkdown-host .ProseMirror,
 .milkdown-host [contenteditable="true"] {
-  min-height: 1.82em;
+  max-width: 760px;
+  min-height: 1.32em;
+  margin: 0;
   padding: 0 !important;
   outline: none;
-  color: inherit;
-  caret-color: #9e6f2e;
+  color: #fc8c02;
+
+  caret-color: #fc8c02;
   font-family: ui-serif, "New York", "Iowan Old Style", "Songti SC", Georgia, serif;
+  font-weight: 450;
+  text-shadow: 0.12px 0 0 #020202;
   font-size: var(--custom-editor-font-size) !important;
   line-height: var(--custom-editor-line-height) !important;
   letter-spacing: var(--custom-editor-letter-spacing) !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+.milkdown-host .ProseMirror ::selection {
+  background: rgba(248, 190, 0, 0.925);
+  color: #020202;
+}
+
+.milkdown-host .ProseMirror::-moz-selection,
+.milkdown-host .ProseMirror ::-moz-selection {
+  background: rgba(214, 174, 92, 0.34);
+  color: #120d06;
+}
+
+.milkdown-host .ProseMirror,
+.milkdown-host .ProseMirror p,
+.milkdown-host .ProseMirror li,
+.milkdown-host .ProseMirror li *,
+.milkdown-host .milkdown-list-item-block .children,
+.milkdown-host .milkdown-list-item-block .children * {
+  color: #000000 !important;
 }
 
 .milkdown-host .ProseMirror > *:first-child { margin-top: 0; }
@@ -37,29 +80,203 @@
 .milkdown-host .ProseMirror h4,
 .milkdown-host .ProseMirror h5,
 .milkdown-host .ProseMirror h6 {
-  color: inherit;
+  color: #2f2b26;
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
-  line-height: 1.3;
+  font-weight: 700;
   letter-spacing: -.025em;
+  margin: 0.2em 0 !important;
 }
-.milkdown-host .ProseMirror h1 { margin: 0 0 .8em; font-size: 32px; font-weight: 700; line-height: 1.25; }
-.milkdown-host .ProseMirror h2 { margin: 1.65em 0 .62em; font-size: 28px; font-weight: 700; line-height: 1.3; }
-.milkdown-host .ProseMirror h3 { margin: 1.45em 0 .52em; font-size: 24px; font-weight: 650; line-height: 1.35; }
-.milkdown-host .ProseMirror h4 { margin: 1.3em 0 .48em; font-size: 20px; font-weight: 650; line-height: 1.45; }
-.milkdown-host .ProseMirror h5 { margin: 1.15em 0 .42em; font-size: 18px; font-weight: 600; line-height: 1.5; }
-.milkdown-host .ProseMirror h6 { margin: 1em 0 .38em; font-size: 16px; font-weight: 600; line-height: 1.55; }
-.milkdown-host .ProseMirror ul, .milkdown-host .ProseMirror ol { padding-left: 1.5em; }
-.milkdown-host .ProseMirror li { margin: .28em 0; }
-.milkdown-host .ProseMirror blockquote { margin: 1.4em 0; padding: .15em 0 .15em 1.15em; border-left: 3px solid #ccb78f; color: #766d62; }
+.milkdown-host .ProseMirror h1 { margin: -0.1em 0 -0.1em !important; font-size: 24px; line-height: 1; }
+.milkdown-host .ProseMirror h2 { margin: -0.1em 0 -0.1em !important; font-size: 20px; line-height: 1; }
+.milkdown-host .ProseMirror h3 { margin: -0.1em 0 -0.1em !important; font-size: 16px; line-height: 1; }
+.milkdown-host .ProseMirror h4,
+.milkdown-host .ProseMirror h5,
+.milkdown-host .ProseMirror h6 { margin: -0.1em 0 -0.1em !important; font-size: 13px; line-height: 1; }
+.milkdown-host .ProseMirror ul,
+.milkdown-host .ProseMirror ol {
+  margin-top: var(--jd-list-block-margin-top);
+  margin-bottom: var(--jd-list-block-margin-bottom);
+  padding-left: 0;
+  list-style: none;
+}
+.milkdown-host .ProseMirror li {
+  position: relative;
+  margin-top: var(--jd-list-row-margin-top);
+  margin-bottom: var(--jd-list-row-margin-bottom);
+  padding-left: .72em;
+}
+.milkdown-host .ProseMirror ol { counter-reset: jsondown-ordered-list; }
+.milkdown-host .ProseMirror ol > li {
+  counter-increment: jsondown-ordered-list;
+  padding-left: .82em;
+}
+.milkdown-host .ProseMirror ol > li::before {
+  content: counter(jsondown-ordered-list) ".";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: .82em;
+  color: #a7a19a;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.milkdown-host .ProseMirror ul > li {
+  padding-left: -.82em;
+}
+.milkdown-host .ProseMirror ul > li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: -.82em;
+  color: #a7a19a;
+  text-align: center;
+}
+.milkdown-host .ProseMirror li p {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.milkdown-host .ProseMirror ul ul,
+.milkdown-host .ProseMirror ol ol,
+.milkdown-host .ProseMirror ul ol,
+.milkdown-host .ProseMirror ol ul {
+  margin-top: var(--jd-list-block-margin-top);
+  margin-bottom: var(--jd-list-block-margin-bottom);
+}
+.milkdown-host .ProseMirror li:has(input[type="checkbox"])::before { content: none; }
+.milkdown-host .ProseMirror li:has(input[type="checkbox"]) {
+  padding-left: 0;
+}
+.milkdown-host .ProseMirror li:has(input[type="checkbox"]) p {
+  transform: translateX(-7px);
+}
+.milkdown-host .ProseMirror input[type="checkbox"] {
+  position: relative;
+  left: 0;
+  top: .14em;
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  vertical-align: 0;
+}
+.milkdown-host .milkdown-list-item-block {
+  margin-top: var(--jd-list-block-margin-top) !important;
+  margin-bottom: var(--jd-list-block-margin-bottom) !important;
+  padding: 0 !important;
+}
+.milkdown-host .milkdown-list-item-block + .milkdown-list-item-block {
+  margin-top: var(--jd-list-task-adjacent-margin-y) !important;
+  margin-bottom: var(--jd-list-row-margin-bottom) !important;
+}
+.milkdown-host .milkdown-list-item-block > .list-item {
+  gap: 0 !important;
+  align-items: flex-start !important;
+}
+.milkdown-host .milkdown-list-item-block li {
+  gap: 0 !important;
+  padding-left: 0 !important;
+}
+.milkdown-host .milkdown-list-item-block li .label-wrapper {
+  width: 15px !important;
+  min-width: 15px !important;
+  height: 1.5em !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: #0b0b0b !important;
+  transform: translate(0,-5px);
+}
+.milkdown-host .milkdown-list-item-block li .label-wrapper svg {
+  width: 15px !important;
+  height: 15px !important;
+  fill: #020202 !important;
+  stroke: #d6d3d3 !important;
+  stroke-width: 0.6px !important;
+}
+.milkdown-host .milkdown-list-item-block li .label-wrapper .label {
+  width: 15px !important;
+  height: 1.5em !important;
+  padding: 0 !important;
+  text-align: left !important;
+}
+.milkdown-host .milkdown-list-item-block > .list-item > .children {
+  flex: 1;
+  min-width: 0;
+  margin-left: 0px !important;
+}
+.milkdown-host .milkdown-list-item-block > .list-item > .children > *:first-child {
+  margin-top: 0 !important;
+}
+.milkdown-host .ProseMirror blockquote {
+margin: .12em 0;
+  padding: 0.1em 0 0.1em .1em;
+  border-left: 5px solid rgba(68, 190, 156, 0.68) !important;
+  background: transparent !important;
+  color: #05e9b3 !important;
+  line-height: 0.8em;
+}
+.milkdown-host .ProseMirror blockquote,
+.milkdown-host .ProseMirror blockquote * {
+  border-right: 0 !important;
+}
+
+.milkdown-host .ProseMirror blockquote::before,
+.milkdown-host .ProseMirror blockquote::after,
+.milkdown-host .ProseMirror blockquote *::before,
+.milkdown-host .ProseMirror blockquote *::after {
+  display: none !important;
+  content: none !important;
+}
+
+.milkdown-host .ProseMirror blockquote,
+.milkdown-host .ProseMirror blockquote p,
+.milkdown-host .ProseMirror blockquote * {
+  color: #188384 !important;
+}
+
+.milkdown-host .ProseMirror blockquote p { display: inline;
+  margin: 0 !important;
+  color: #079eb5 !important;
+  background: rgba(81, 206, 171, 0.12);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone; }
+
+
+.milkdown-host .ProseMirror blockquote p + p { margin-top: .32em !important; }
 .milkdown-host .ProseMirror a { color: #9c6724; text-decoration-color: rgba(156,103,36,.35); text-underline-offset: 3px; }
 .milkdown-host .ProseMirror em {
   font-style: oblique 14deg !important;
   font-synthesis: style;
 }
-.milkdown-host .ProseMirror code { padding: .14em .34em; border-radius: 4px; background: rgba(100,87,68,.08); font: .87em ui-monospace, SFMono-Regular, Menlo, monospace; }
-.milkdown-host .ProseMirror pre { border: 1px solid rgba(70,64,56,.12) !important; border-radius: 8px !important; background: #242527 !important; box-shadow: none !important; }
-.milkdown-host .ProseMirror hr { margin: 2em 0; border: 0; border-top: 1px solid rgba(70,62,52,.13); }
-.milkdown-host .ProseMirror table { font-family: ui-sans-serif, -apple-system, sans-serif; font-size: 13px; }
+.milkdown-host .ProseMirror code { padding: .08em .28em; border-radius: 4px; background: rgba(100,87,68,.08); font: .9em ui-monospace, SFMono-Regular, Menlo, monospace; }
+.milkdown-host .ProseMirror pre {
+  margin: .65em 0;
+  padding: .75em .9em !important;
+  border: 1px solid rgba(70,64,56,.12) !important;
+  border-radius: 8px !important;
+  background: #242527 !important;
+  box-shadow: none !important;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.milkdown-host .ProseMirror hr { margin: .85em 0; border: 0; border-top: 1px solid rgba(70,62,52,.12); }
+.milkdown-host .ProseMirror span[style*="background-color"] {
+  border-radius: 3px;
+  padding: 0 .16em;
+  line-height: 1;
+}
+.milkdown-host .ProseMirror table {
+  margin: .65em 0;
+  border-collapse: collapse;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
+  font-size: 13px;
+}
+.milkdown-host .ProseMirror th,
+.milkdown-host .ProseMirror td {
+  padding: .35em .55em;
+  border: 1px solid rgba(70,62,52,.12);
+}
 
 .milkdown-host [data-milkdown-root] { background: transparent !important; }
 .milkdown-host milkdown-block-handle,
