@@ -44,7 +44,7 @@ export function RootFolderSidebar() {
   } = useRootFolderStore()
   const expandedRootIds = useFileTreeStore((state) => state.expandedRootIds)
   const toggleRootExpanded = useFileTreeStore((state) => state.toggleRootExpanded)
-  const openFile = useEditorStore((state) => state.openFile)
+  const requestOpenFile = useEditorStore((state) => state.requestOpenFile)
   const pendingEmptyFile = useEditorStore((state) => state.pendingEmptyFile)
   const contents = useEditorStore((state) => state.contents)
   const runAfterPendingCleanup = useEditorStore((state) => state.runAfterPendingCleanup)
@@ -58,7 +58,11 @@ export function RootFolderSidebar() {
   const [allMenu, setAllMenu] = useState<{ x: number; y: number } | null>(null)
   const ordered = useMemo(() => [...folders].sort((a, b) => a.order - b.order), [folders])
   const importTarget = ordered.find((folder) => folder.id === activeFolderId) ?? ordered[0]
-  const allFilesCount = ordered.reduce((sum, folder) => sum + flattenFiles(folder.tree ?? [], folder.path).length, 0)
+  const allFiles = useMemo(
+    () => ordered.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id)),
+    [ordered],
+  )
+  const allFilesCount = allFiles.length
   const newFileLocked = Boolean(pendingEmptyFile && !(contents[pendingEmptyFile.id] ?? '').trim())
   const newFileLockedTitle = '请先输入内容，或切换后自动清理当前空文件'
 
@@ -280,7 +284,7 @@ export function RootFolderSidebar() {
             }
             if (!importTarget) return
             const id = importMockFile(importTarget.id)
-            if (id) openFile(id)
+            if (id) void requestOpenFile(id, allFiles)
             showToast('已模拟导入文件')
           })()
         }}
@@ -305,7 +309,7 @@ export function RootFolderSidebar() {
           onNewFile={() => {
             void createMockFile(menu.folder.id).then((id) => {
               if (id) {
-                openFile(id)
+                void requestOpenFile(id, allFiles)
                 showToast(`已在“${menu.folder.name}”下新建文件`)
               }
             })

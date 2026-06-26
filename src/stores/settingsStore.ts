@@ -3,10 +3,10 @@ import type { CustomEditorLayout, LayoutDensity } from '../types/settings'
 
 export const defaultCustomEditorLayout: CustomEditorLayout = {
   fontSize: 14,
-  lineHeight: 1.25,
-  paragraphSpacing: -10,
-  letterSpacing: -0.4,
-  horizontalPadding: 4,
+  lineHeight: 1.6,
+  paragraphSpacing: 6,
+  letterSpacing: 0,
+  horizontalPadding: 22,
 }
 
 type SettingsState = {

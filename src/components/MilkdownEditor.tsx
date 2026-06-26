@@ -3,6 +3,7 @@ import { commandsCtx, editorViewCtx, editorViewOptionsCtx, remarkStringifyOption
 import { redoCommand, undoCommand } from '@milkdown/kit/plugin/history'
 import { toggleMark } from '@milkdown/prose/commands'
 import { TextSelection, type Selection } from '@milkdown/prose/state'
+import type { EditorView } from '@milkdown/prose/view'
 import { $markSchema, $remark } from '@milkdown/utils'
 import {
   insertHrCommand,
@@ -155,17 +156,21 @@ const jsondownHighlightSchema = $markSchema('jsondownHighlight', () => ({
 type MilkdownEditorProps = {
   value: string
   autoFocusStart?: boolean
+  readOnly?: boolean
   onChange: (markdown: string) => void
   onReady?: (api: EditorCommandApi | null) => void
 }
 
-export function MilkdownEditor({ value, autoFocusStart, onChange, onReady }: MilkdownEditorProps) {
+export function MilkdownEditor({ value, autoFocusStart, readOnly = false, onChange, onReady }: MilkdownEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const onChangeRef = useRef(onChange)
   const onReadyRef = useRef(onReady)
   const initialValueRef = useRef(value)
+  const readOnlyRef = useRef(readOnly)
+  const editorViewRef = useRef<EditorView | null>(null)
   onChangeRef.current = onChange
   onReadyRef.current = onReady
+  readOnlyRef.current = readOnly
 
   useEffect(() => {
     if (!rootRef.current) return
@@ -188,6 +193,7 @@ export function MilkdownEditor({ value, autoFocusStart, onChange, onReady }: Mil
     crepe.editor.config((ctx) => {
       ctx.update(editorViewOptionsCtx, (options) => ({
         ...options,
+        editable: () => !readOnlyRef.current,
         handleScrollToSelection: () => true,
       }))
       ctx.update(remarkStringifyOptionsCtx, (options) => ({
@@ -214,7 +220,7 @@ export function MilkdownEditor({ value, autoFocusStart, onChange, onReady }: Mil
 
     crepe.on((listener) => {
       listener.markdownUpdated((_ctx, markdown, previousMarkdown) => {
-        if (!disposed && markdown !== previousMarkdown) onChangeRef.current(markdown)
+        if (!readOnlyRef.current && !disposed && markdown !== previousMarkdown) onChangeRef.current(markdown)
       })
     })
 
@@ -306,6 +312,12 @@ export function MilkdownEditor({ value, autoFocusStart, onChange, onReady }: Mil
     const createPromise = crepe.create()
     void createPromise.then(() => {
       if (disposed) return
+      crepe.editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx)
+        editorViewRef.current = view
+        view.setProps({ editable: () => !readOnlyRef.current })
+        return true
+      })
       onReadyRef.current?.({
         rememberSelection,
         run,
@@ -320,7 +332,7 @@ export function MilkdownEditor({ value, autoFocusStart, onChange, onReady }: Mil
             }),
           applyColor,
       })
-      if (autoFocusStart) {
+      if (!readOnlyRef.current && autoFocusStart) {
         crepe.editor.action((ctx) => {
           const view = ctx.get(editorViewCtx)
           const start = Math.min(1, view.state.doc.content.size)
@@ -333,10 +345,22 @@ export function MilkdownEditor({ value, autoFocusStart, onChange, onReady }: Mil
 
     return () => {
       disposed = true
+      editorViewRef.current = null
       onReadyRef.current?.(null)
       void createPromise.then(() => crepe.destroy())
     }
   }, [])
 
-  return <div ref={rootRef} className="milkdown-host" />
+  useEffect(() => {
+    readOnlyRef.current = readOnly
+    const view = editorViewRef.current
+    view?.setProps({ editable: () => !readOnlyRef.current })
+    if (!readOnly) {
+      window.requestAnimationFrame(() => {
+        editorViewRef.current?.focus()
+      })
+    }
+  }, [readOnly])
+
+  return <div ref={rootRef} className={`milkdown-host ${readOnly ? 'is-readonly' : ''}`} />
 }

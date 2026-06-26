@@ -23,7 +23,7 @@ export function EditorPane() {
   const folders = useRootFolderStore((state) => state.folders)
   const activeFolderId = useRootFolderStore((state) => state.activeFolderId)
   const createMockDocument = useRootFolderStore((state) => state.createMockDocument)
-  const { activeFileId, contents, pendingEmptyFile, saveStatus, openFile, updateContent } = useEditorStore()
+  const { activeFileId, contents, loadedPaths, pendingEmptyFile, saveStatus, requestOpenFile, updateContent } = useEditorStore()
   const loadFileContent = useEditorStore((state) => state.loadFileContent)
   const saveFileContent = useEditorStore((state) => state.saveFileContent)
   const readonlyEntries = useOpenedFileCacheStore((state) => state.entries)
@@ -36,6 +36,8 @@ export function EditorPane() {
   const [editingFileId, setEditingFileId] = useState<string | null>(null)
   const saveTimer = useRef<number | undefined>(undefined)
   const editorScrollRef = useRef<HTMLDivElement>(null)
+  const pendingEditScrollTopRef = useRef<number | null>(null)
+  const previousActiveFileIdRef = useRef<string | null>(null)
 
   const allFiles = useMemo(
     () => folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id)),
@@ -43,6 +45,7 @@ export function EditorPane() {
   )
   const file = allFiles.find((item) => item.id === activeFileId)
   const content = activeFileId ? (contents[activeFileId] ?? '') : ''
+  const fullContentLoaded = Boolean(file && loadedPaths[file.id] === file.path && contents[file.id] !== undefined)
   const isNewFileLocked = Boolean(pendingEmptyFile && !(contents[pendingEmptyFile.id] ?? '').trim())
   const readonlyEntry = file ? readonlyEntries[getReadonlyKey(file)] : undefined
   const isEditing = Boolean(file?.editable && editingFileId === file.id)
@@ -54,6 +57,10 @@ export function EditorPane() {
       return
     }
     if (file.kind === 'image') {
+      void loadFileContent(file.id, file.path, file.kind)
+      return
+    }
+    if (file.editable) {
       void loadFileContent(file.id, file.path, file.kind)
       return
     }
@@ -70,13 +77,19 @@ export function EditorPane() {
   }, [file?.id, isEditing, readonlyEntry?.path])
 
   useEffect(() => {
+    const previousActiveFileId = previousActiveFileIdRef.current
+    previousActiveFileIdRef.current = activeFileId
+
     if (!activeFileId) {
       setEditingFileId(null)
+      setEditorApi(null)
       return
     }
-    if (pendingEmptyFile?.id === activeFileId) setEditingFileId(activeFileId)
-    else setEditingFileId(null)
-    setEditorApi(null)
+
+    if (previousActiveFileId !== activeFileId) {
+      setEditingFileId(pendingEmptyFile?.id === activeFileId ? activeFileId : null)
+      setEditorApi(null)
+    }
   }, [activeFileId, pendingEmptyFile?.id])
 
   useEffect(() => {
@@ -95,18 +108,52 @@ export function EditorPane() {
   const createDocument = () => {
     void createMockDocument(activeFolderId).then((id) => {
       if (id) {
-        openFile(id)
+        void requestOpenFile(id, allFiles)
         showToast('已新建 Markdown 笔记')
       }
     })
   }
 
-  const enterEditing = () => {
-    if (!file?.editable) return
-    void loadFileContent(file.id, file.path, file.kind).then(() => {
-      setEditingFileId(file.id)
+  const logScrollMetrics = (label: string) => {
+    if (!import.meta.env.DEV) return
+    const scroll = editorScrollRef.current
+    if (!scroll) return
+    console.debug(`[scroll:${label}]`, {
+      scrollTop: scroll.scrollTop,
+      scrollHeight: scroll.scrollHeight,
+      clientHeight: scroll.clientHeight,
+      distanceToBottom: scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight,
     })
   }
+
+  const enterEditing = () => {
+    if (!file?.editable) return
+    logScrollMetrics('before-enter-editing')
+    pendingEditScrollTopRef.current = editorScrollRef.current?.scrollTop ?? null
+    void loadFileContent(file.id, file.path, file.kind).then(() => {
+      setEditingFileId(file.id)
+      window.requestAnimationFrame(() => {
+        logScrollMetrics('after-editing-raf-1')
+        window.requestAnimationFrame(() => {
+          logScrollMetrics('after-editing-raf-2')
+        })
+      })
+    })
+  }
+
+  useEffect(() => {
+    if (!isEditing) return
+    const scrollTop = pendingEditScrollTopRef.current
+    if (scrollTop === null) return
+    pendingEditScrollTopRef.current = null
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const scroll = editorScrollRef.current
+        if (!scroll) return
+        scroll.scrollTop = Math.min(scrollTop, Math.max(0, scroll.scrollHeight - scroll.clientHeight))
+      })
+    })
+  }, [isEditing, file?.id])
 
   const updateEditorContent = (id: string, markdown: string) => {
     const scroll = editorScrollRef.current
@@ -156,7 +203,7 @@ export function EditorPane() {
         >
           <SquarePen size={15} />
         </button>
-        <TopEditorToolbar api={editorApi} disabled={!file?.editable} />
+        <TopEditorToolbar api={editorApi} disabled={!file?.editable || !isEditing} />
         <div className="editor-actions">
           {file?.editable && <SaveStatus status={saveStatus} />}
           <LayoutDensitySwitcher />
@@ -185,25 +232,40 @@ export function EditorPane() {
       ) : (
         <div ref={editorScrollRef} className="editor-scroll" onScroll={handleEditorScroll}>
           <div className="note-created-time">{formatDisplayTime(file.createdAt ?? file.updatedAt ?? new Date().toISOString())}</div>
-          {file.editable && isEditing ? (
-            <article className="paper">
-              <MilkdownEditor
-                key={file.id}
-                value={content}
-                autoFocusStart={pendingEmptyFile?.id === file.id}
-                onReady={setEditorApi}
-                onChange={(markdown) => updateEditorContent(file.id, markdown)}
-              />
-            </article>
-          ) : file.kind === 'image' ? (
+          {file.kind === 'image' ? (
             <ImagePreview src={content} name={file.name} />
           ) : (
-            <ReadonlyChunkViewer
-              file={file}
-              entry={readonlyEntry}
-              editable={file.editable}
-              onEnterEdit={enterEditing}
-            />
+            <article className="paper">
+              {file.editable ? (
+                fullContentLoaded ? (
+                  <div
+                    className={`milkdown-mode-shell ${isEditing ? 'is-editing' : 'is-readonly'}`}
+                    title={!isEditing ? '点击正文进入编辑' : undefined}
+                    onClick={() => {
+                      if (!isEditing) enterEditing()
+                    }}
+                  >
+                    <MilkdownEditor
+                      key={file.id}
+                      value={content}
+                      readOnly={!isEditing}
+                      autoFocusStart={pendingEmptyFile?.id === file.id}
+                      onReady={setEditorApi}
+                      onChange={(markdown) => updateEditorContent(file.id, markdown)}
+                    />
+                  </div>
+                ) : (
+                  <div className="readonly-skeleton">正在加载文档…</div>
+                )
+              ) : (
+                <ReadonlyChunkViewer
+                  file={file}
+                  entry={readonlyEntry}
+                  editable={file.editable}
+                  onEnterEdit={enterEditing}
+                />
+              )}
+            </article>
           )}
         </div>
       )}

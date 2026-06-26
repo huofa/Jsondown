@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, File, FileCode2, FileImage, Folder, FolderOpen, MoreHorizontal } from 'lucide-react'
-import { useState, type MouseEvent } from 'react'
+import { useMemo, useState, type MouseEvent } from 'react'
 import type { FileTreeNode } from '../types/fileTree'
 import { useFileTreeStore } from '../stores/fileTreeStore'
 import { useEditorStore } from '../stores/editorStore'
@@ -12,6 +12,7 @@ import {
 } from '../services/tauriFileService'
 import { isViewableFile } from '../utils/fileFilters'
 import { countViewableFiles, findParentFolderId } from '../utils/folderSelection'
+import { flattenFiles } from '../utils/flattenFiles'
 import { ContextMenu } from './ContextMenu'
 import { RenameDialog } from './RenameDialog'
 import { showToast } from './Toast'
@@ -33,7 +34,7 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
   const expandedIds = useFileTreeStore((state) => state.expandedIds)
   const toggleExpanded = useFileTreeStore((state) => state.toggleExpanded)
   const activeFileId = useEditorStore((state) => state.activeFileId)
-  const openFile = useEditorStore((state) => state.openFile)
+  const requestOpenFile = useEditorStore((state) => state.requestOpenFile)
   const closeFile = useEditorStore((state) => state.closeFile)
   const pendingEmptyFile = useEditorStore((state) => state.pendingEmptyFile)
   const contents = useEditorStore((state) => state.contents)
@@ -54,6 +55,10 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
   const [menu, setMenu] = useState<{ x: number; y: number; node: FileTreeNode } | null>(null)
   const [renameTarget, setRenameTarget] = useState<FileTreeNode | null>(null)
   const newFileLocked = Boolean(pendingEmptyFile && !(contents[pendingEmptyFile.id] ?? '').trim())
+  const allFiles = useMemo(
+    () => folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id)),
+    [folders],
+  )
 
   const openFolderMenu = (event: MouseEvent, node: FileTreeNode) => {
     event.preventDefault()
@@ -111,7 +116,7 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
             onClick={() => {
               const openTarget = () => {
                 selectFolder(parentFolderId ?? rootFolderId ?? 'all')
-                openFile(node.id)
+                void requestOpenFile(node.id, allFiles)
               }
               if (pendingEmptyFile?.id === node.id) {
                 openTarget()
@@ -153,7 +158,7 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
           onNewFile={menu.node.kind === 'directory' ? () => {
             void createMockFile(menu.node.id).then((id) => {
               if (id) {
-                openFile(id)
+                void requestOpenFile(id, allFiles)
                 showToast(`已在“${menu.node.name}”下新建文件`)
               }
             })
@@ -208,7 +213,7 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
             return
           }
           const nextId = await renameFile(renameTarget.path, name)
-          if (nextId && activeFileId === renameTarget.id) openFile(nextId)
+          if (nextId && activeFileId === renameTarget.id) void requestOpenFile(nextId, allFiles)
           showToast('已重命名文件')
         }}
       />

@@ -59,7 +59,7 @@ export function LayoutDensitySwitcher() {
               上下间距 <span>{customEditorLayout.paragraphSpacing}px</span>
               <input
                 type="range"
-                min="-12"
+                min="0"
                 max="36"
                 step="1"
                 value={customEditorLayout.paragraphSpacing}
@@ -81,7 +81,7 @@ export function LayoutDensitySwitcher() {
               左右边距 <span>{customEditorLayout.horizontalPadding}px</span>
               <input
                 type="range"
-                min="4"
+                min="8"
                 max="96"
                 step="2"
                 value={customEditorLayout.horizontalPadding}
