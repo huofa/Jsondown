@@ -26,6 +26,7 @@ type OpenedFileCacheStore = {
   entries: Record<string, OpenedFileCacheEntry>
   openReadonlyFile: (file: EditableFile) => Promise<void>
   loadNextReadonlyChunk: (file: EditableFile) => Promise<void>
+  ensureReadonlyBytes: (file: EditableFile, minBytes: number) => Promise<void>
   updateScrollTop: (file: EditableFile, scrollTop: number) => void
   getCacheKey: (file: EditableFile) => string
   invalidatePath: (path: string) => void
@@ -141,6 +142,19 @@ export const useOpenedFileCacheStore = create<OpenedFileCacheStore>((set, get) =
       })
     } finally {
       loadingMoreKeys.delete(key)
+    }
+  },
+  ensureReadonlyBytes: async (file, minBytes) => {
+    const key = getCacheKey(file)
+    let safety = 0
+
+    while (safety < 12) {
+      const entry = get().entries[key]
+      if (!entry || entry.mode !== 'readonly' || entry.readonlyEof) return
+      if (entry.readonlyLoadedBytes >= minBytes) return
+
+      await get().loadNextReadonlyChunk(file)
+      safety += 1
     }
   },
   updateScrollTop: (file, scrollTop) => {

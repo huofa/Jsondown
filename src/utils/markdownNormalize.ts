@@ -37,6 +37,7 @@ const changeDescriptions: Record<string, string> = {
   headingSyntax: '清理标题多余符号',
   headingHierarchy: '按正文结构压缩标题层级',
   falseCodeFence: '普通说明文字代码块转回 Markdown 正文',
+  structureFence: '结构化内容转为等宽结构块',
   separator: '超长分割线转为 ---',
   emptyLines: '连续空行压缩',
   spanStyle: '清理 span 中非 Jsondown 标准样式',
@@ -122,6 +123,7 @@ function sanitizeSpanStyleInLine(line: string, changes: Counter, warnings: Count
 
 function detectHeading(line: string, index: number, changes: Counter): HeadingCandidate | undefined {
   const trimmed = line.trim()
+  if (isTechnicalLabelLine(trimmed) || isStructureLikeLine(trimmed)) return undefined
 
   const html = trimmed.match(/^<h([1-6])\b[^>]*>(.*?)<\/h\1>$/i)
   if (html) {
@@ -142,6 +144,7 @@ function detectHeading(line: string, index: number, changes: Counter): HeadingCa
   const boldOnly = trimmed.match(/^(\*{2,3}|_{2,3})(.+?)\1$/)
   if (boldOnly && boldOnly[2].trim().length <= 56) {
     const { text, changed } = stripWrappingMarks(boldOnly[2])
+    if (isTechnicalLabelLine(text) || isStructureLikeLine(text) || /[_=]/.test(text)) return undefined
     add(changes, 'headingSyntax')
     if (changed) add(changes, 'headingSyntax')
     return text ? { index, rawLevel: 6, text, kind: 'bold' } : undefined
@@ -219,6 +222,26 @@ function normalizeEditableLine(line: string, index: number, changes: Counter, wa
   }
 
   return { text: next, protected: false, heading: detectHeading(next, index, changes) }
+}
+
+function isTechnicalLabelLine(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return false
+  if (/^(YAML|JSON|HTML|XML|CSS|SQL|TS|JS|API|Schema|schema)$/i.test(trimmed)) return true
+  if (/^[a-z][a-z0-9_-]*\s*[:=]\s*[^，。；;]+(?:\s+[a-z][a-z0-9_-]*\s*[:=]\s*[^，。；;]+)+$/i.test(trimmed)) return true
+  if (/^[a-z][a-z0-9_-]*(?:\s+[a-z][a-z0-9_-]*){1,}\s*[:=]\s*[^，。；;]+$/i.test(trimmed)) return true
+  return false
+}
+
+function isStructureLikeLine(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return false
+  if (/[├└│┬┴┌┐┘┤─━]/.test(trimmed)) return true
+  if (/^\|.*\|$/.test(trimmed) && (trimmed.match(/\|/g) ?? []).length >= 3) return true
+  if (/^[\w./-]+\s*(?:[|｜]\s*[\\/\w.{}[\]_-]+){3,}/.test(trimmed)) return true
+  if (/^[{[]/.test(trimmed) && /[}\]]$/.test(trimmed)) return true
+  if (/^["']?[\w-]+["']?\s*:\s*["'{[\w-]/.test(trimmed) && /[,}]?$/.test(trimmed)) return true
+  return false
 }
 
 function applyHeadingHierarchy(lines: ProcessedLine[], changes: Counter) {
@@ -333,6 +356,76 @@ function compressEmptyLines(lines: ProcessedLine[], changes: Counter) {
   return result
 }
 
+function isMarkdownTableLine(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed.startsWith('|') || !trimmed.endsWith('|')) return false
+  return (trimmed.match(/\|/g) ?? []).length >= 2
+}
+
+function getStructureFenceLanguage(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (isMarkdownTableLine(trimmed)) return null
+  if (/[├└│┬┴┌┐┘┤─━]/.test(trimmed)) return 'text'
+  if (/^[\w./-]+\s*(?:[|｜]\s*[\\/\w.{}[\]_-]+){3,}/.test(trimmed)) return 'text'
+  if (isProbablyJson(trimmed)) return 'json'
+  if (/^[a-z][a-z0-9_-]*\s*[:=]\s*[^，。；;]+(?:\s+[a-z][a-z0-9_-]*\s*[:=]\s*[^，。；;]+)+$/i.test(trimmed)) return 'yaml'
+  if (/^[a-z][a-z0-9_-]*\s*[:=]\s*[^，。；;]+$/i.test(trimmed)) return 'yaml'
+  if (/^[{[]/.test(trimmed) || /^["'][\w-]+["']\s*:\s*/.test(trimmed)) return 'json'
+  return null
+}
+
+function wrapStructureBlocks(lines: ProcessedLine[], changes: Counter) {
+  const result: ProcessedLine[] = []
+  let index = 0
+
+  while (index < lines.length) {
+    const line = lines[index]
+    const language = !line.protected ? getStructureFenceLanguage(line.text) : null
+
+    if (!language) {
+      result.push(line)
+      index += 1
+      continue
+    }
+
+    const block: ProcessedLine[] = []
+    let blockLanguage = language
+    let cursor = index
+
+    while (cursor < lines.length) {
+      const candidate = lines[cursor]
+      const candidateLanguage = !candidate.protected ? getStructureFenceLanguage(candidate.text) : null
+      if (!candidateLanguage) break
+      if (candidateLanguage === 'json') blockLanguage = 'json'
+      else if (candidateLanguage === 'yaml' && blockLanguage !== 'json') blockLanguage = 'yaml'
+      block.push(candidate)
+      cursor += 1
+    }
+
+    const shouldWrapSingle =
+      block.length > 1 ||
+      blockLanguage === 'json' ||
+      /^[a-z][a-z0-9_-]*\s*[:=]\s*[^，。；;]+(?:\s+[a-z][a-z0-9_-]*\s*[:=]\s*[^，。；;]+)+$/i.test(block[0]?.text.trim() ?? '') ||
+      /[├└│┬┴┌┐┘┤─━]/.test(block[0]?.text ?? '') ||
+      /^[\w./-]+\s*(?:[|｜]\s*[\\/\w.{}[\]_-]+){3,}/.test(block[0]?.text.trim() ?? '')
+
+    if (!shouldWrapSingle) {
+      result.push(line)
+      index += 1
+      continue
+    }
+
+    add(changes, 'structureFence')
+    result.push({ text: `\`\`\`${blockLanguage}`, protected: true })
+    block.forEach((blockLine) => result.push({ text: blockLine.text, protected: true }))
+    result.push({ text: '```', protected: true })
+    index = cursor
+  }
+
+  return result
+}
+
 const nonCodeFenceLanguages = new Set(['', 'text', 'txt', 'plain', 'plaintext', 'md', 'markdown'])
 
 function getFenceInfo(line: string) {
@@ -367,6 +460,8 @@ function isRealCodeFence(openingLine: string, contentLines: string[]) {
 
   const nonEmptyLines = contentLines.map((line) => line.trim()).filter(Boolean)
   if (nonEmptyLines.length === 0) return false
+
+  if (nonEmptyLines.some((line) => getStructureFenceLanguage(line))) return true
 
   const codeSignals = [
     /^\s*(import|export|const|let|var|function|class|return|if|for|while|try|catch|switch)\b/m,
@@ -448,8 +543,9 @@ export function normalizeMarkdownForJsondown(input: string): MarkdownNormalizeRe
     processed.push(normalizeEditableLine(line, processed.length, changes, warnings))
   }
 
-  applyHeadingHierarchy(processed, changes)
-  const compressed = compressEmptyLines(processed, changes)
+  const structured = wrapStructureBlocks(processed, changes)
+  applyHeadingHierarchy(structured, changes)
+  const compressed = compressEmptyLines(structured, changes)
   const markdown = compressed.map((line) => line.text).join('\n')
 
   return {

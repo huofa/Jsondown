@@ -1,26 +1,48 @@
 import type { EditableFile } from '../types/file'
 import type { OpenedFileCacheEntry } from '../stores/openedFileCacheStore'
-import { MilkdownEditor } from './MilkdownEditor'
+import { MarkdownRenderedViewer } from './MarkdownRenderedViewer'
+
+export type ReadonlyEditAnchor = {
+  clientX: number
+  clientY: number
+  viewportOffset?: number
+  textSnippet?: string
+}
 
 type ReadonlyChunkViewerProps = {
   file: EditableFile
   entry?: OpenedFileCacheEntry
   editable?: boolean
-  onEnterEdit?: () => void
+  onEnterEdit?: (anchor?: ReadonlyEditAnchor) => void
 }
 
 export function ReadonlyChunkViewer({ file, entry, editable, onEnterEdit }: ReadonlyChunkViewerProps) {
   const text = entry?.readonlyChunks.map((chunk) => chunk.text).join('') ?? ''
-  const shouldUseReadonlyMilkdown = file.kind === 'markdown'
-  const showMeta = !shouldUseReadonlyMilkdown
+  const shouldUseMarkdownRenderer = file.kind === 'markdown'
+  const showMeta = !shouldUseMarkdownRenderer
 
   return (
     <article
       className={`readonly-chunk-viewer ${editable ? 'is-editable' : ''}`}
-      onClick={() => {
-        if (editable) onEnterEdit?.()
+      onClick={(event) => {
+        if (!editable) return
+
+        const target = event.target as HTMLElement | null
+        if (target?.closest?.('button, a, input, textarea, select')) return
+
+        const scroll = target?.closest?.('.editor-scroll') as HTMLElement | null
+        const block = target?.closest?.('[data-jd-readonly-block]') as HTMLElement | null
+        const viewportOffset = block && scroll
+          ? block.getBoundingClientRect().top - scroll.getBoundingClientRect().top
+          : undefined
+
+        onEnterEdit?.({
+          clientX: event.clientX,
+          clientY: event.clientY,
+          viewportOffset,
+          textSnippet: block?.dataset.jdText || block?.textContent?.trim().slice(0, 80),
+        })
       }}
-      title={editable ? '点击正文进入编辑' : undefined}
     >
       <div className="readonly-file-shell">
         {showMeta && (
@@ -32,15 +54,8 @@ export function ReadonlyChunkViewer({ file, entry, editable, onEnterEdit }: Read
         )}
         {entry?.mode === 'readonly-loading' && <div className="readonly-skeleton">正在加载前四屏内容…</div>}
         {entry?.mode === 'error' && <div className="readonly-error">{entry.error ?? '读取失败'}</div>}
-        {entry?.mode === 'readonly' && (shouldUseReadonlyMilkdown
-          ? (
-            <MilkdownEditor
-              key={`${file.id}:readonly:${entry.updatedAt ?? ''}:${text.length}`}
-              value={text}
-              readOnly
-              onChange={() => {}}
-            />
-          )
+        {entry?.mode === 'readonly' && (shouldUseMarkdownRenderer
+          ? <MarkdownRenderedViewer markdown={text} />
           : <pre className="readonly-plain-text"><code>{text || '暂无内容'}</code></pre>)}
       </div>
     </article>

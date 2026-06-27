@@ -73,6 +73,7 @@
 .milkdown-host .ProseMirror p {
   margin-top: 0 !important;
   margin-bottom: var(--custom-editor-paragraph-spacing) !important;
+  white-space: pre-wrap;
 }
 .milkdown-host .ProseMirror h1,
 .milkdown-host .ProseMirror h2,
@@ -135,6 +136,7 @@
 .milkdown-host .ProseMirror li p {
   margin: 0 !important;
   padding: 0 !important;
+  white-space: pre-wrap;
 }
 .milkdown-host .ProseMirror ul ul,
 .milkdown-host .ProseMirror ol ol,
@@ -249,16 +251,155 @@ margin: .12em 0;
   font-style: oblique 14deg !important;
   font-synthesis: style;
 }
-.milkdown-host .ProseMirror code { padding: .08em .28em; border-radius: 4px; background: rgba(100,87,68,.08); font: .9em ui-monospace, SFMono-Regular, Menlo, monospace; }
+.milkdown-host .ProseMirror code { padding: .08em .28em; border-radius: 4px; background: rgba(100,87,68,.08); font: .9em ui-monospace, SFMono-Regular, Menlo,Consolas, "Liberation Mono",  monospace; }
+/* =========================================================
+   Jsondown / Milkdown 代码块样式
+   目标：接近 ChatGPT 代码块卡片样式
+   位置：替换原 254 行开始的 .ProseMirror pre 代码块区域
+   ========================================================= */
+
 .milkdown-host .ProseMirror pre {
-  margin: .65em 0;
-  padding: .75em .9em !important;
-  border: 1px solid rgba(70,64,56,.12) !important;
-  border-radius: 8px !important;
-  background: #242527 !important;
+  position: relative;
+
+  /* 外部距离：代码块与正文之间的距离 */
+  margin: .85em 0 1em;
+
+  /* 顶部预留给 JSON / 复制栏 */
+  padding: 2.45em 1.05em 1.05em !important;
+
+  /* 图 1 那种浅灰卡片 */
+  background: #f7f7f8 !important;
+  border: 1px solid #ececef !important;
+  border-radius: 14px !important;
   box-shadow: none !important;
+
+  /* 尺寸和排版 */
+  max-width: 100%;
+  overflow: hidden;
+  text-align: left;
+
   font-size: 12px;
   line-height: 1.55;
+}
+
+.milkdown-host .ProseMirror pre,
+.milkdown-host .ProseMirror pre * {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace !important;
+}
+
+.milkdown-host .ProseMirror pre code {
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #24292f !important;
+  font-size: 12px !important;
+  line-height: 1.55 !important;
+}
+
+.milkdown-host .ProseMirror pre .cm-editor,
+.milkdown-host .ProseMirror pre .cm-scroller,
+.milkdown-host .ProseMirror pre .cm-content {
+  background: transparent !important;
+  color: #24292f !important;
+  font-size: 12px !important;
+  line-height: 1.55 !important;
+}
+
+.milkdown-host .ProseMirror pre .cm-editor {
+  outline: none !important;
+}
+
+.milkdown-host .ProseMirror pre .cm-scroller {
+  overflow: auto !important;
+  padding: 0 !important;
+}
+
+.milkdown-host .ProseMirror pre .cm-content {
+  padding: 0 !important;
+  min-height: auto !important;
+}
+
+.milkdown-host .ProseMirror pre .cm-line {
+  padding: 0 !important;
+}
+.milkdown-host .ProseMirror pre .cm-gutters,
+.milkdown-host .ProseMirror pre .cm-lineNumbers,
+.milkdown-host .ProseMirror pre .cm-foldGutter,
+.milkdown-host .ProseMirror pre .cm-activeLineGutter {
+  display: none !important;
+}
+.milkdown-host .ProseMirror pre .cm-activeLine {
+
+  background: transparent !important;
+
+}
+.milkdown-host .ProseMirror pre select,
+.milkdown-host .ProseMirror pre [data-language],
+.milkdown-host .ProseMirror pre [data-milkdown-component*="language" i],
+.milkdown-host .ProseMirror pre [aria-label*="language" i],
+.milkdown-host .ProseMirror pre [title*="language" i] {
+  display: none !important;
+}
+.milkdown-host .ProseMirror pre button,
+.milkdown-host .ProseMirror pre [aria-label*="copy" i],
+.milkdown-host .ProseMirror pre [title*="copy" i],
+.milkdown-host .ProseMirror pre [class*="copy" i] {
+  position: absolute !important;
+  right: 1.05em !important;
+  top: .62em !important;
+
+  opacity: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: .25em !important;
+
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+
+  color: #2f2f33 !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+
+  transition: opacity .12s ease;
+}
+/* JSON key / property */
+.milkdown-host .ProseMirror pre .cm-propertyName,
+.milkdown-host .ProseMirror pre .cm-def,
+.milkdown-host .ProseMirror pre .cm-attribute {
+  color: #8a5a2b !important;
+}
+
+/* JSON string value */
+.milkdown-host .ProseMirror pre .cm-string {
+  color: #d12f3f !important;
+}
+
+/* number / boolean / null */
+.milkdown-host .ProseMirror pre .cm-number,
+.milkdown-host .ProseMirror pre .cm-bool,
+.milkdown-host .ProseMirror pre .cm-null,
+.milkdown-host .ProseMirror pre .cm-keyword {
+  color: #9b4dca !important;
+}
+
+/* punctuation: {}, [], :, , */
+.milkdown-host .ProseMirror pre .cm-punctuation,
+.milkdown-host .ProseMirror pre .cm-bracket {
+  color: #24292f !important;
+}
+.milkdown-host .ProseMirror pre button:hover,
+.milkdown-host .ProseMirror pre [aria-label*="copy" i]:hover,
+.milkdown-host .ProseMirror pre [title*="copy" i]:hover,
+.milkdown-host .ProseMirror pre [class*="copy" i]:hover {
+  opacity: .72 !important;
+}
+.milkdown-host .ProseMirror pre:hover button,
+.milkdown-host .ProseMirror pre:hover [aria-label*="copy" i],
+.milkdown-host .ProseMirror pre:hover [title*="copy" i],
+.milkdown-host .ProseMirror pre:hover [class*="copy" i] {
+  opacity: 1 !important;
 }
 .milkdown-host .ProseMirror hr { margin: .85em 0; border: 0; border-top: 1px solid rgba(70,62,52,.12); }
 .milkdown-host .ProseMirror span[style*="background-color"] {
@@ -303,4 +444,514 @@ margin: .12em 0;
 .milkdown-host [role="tooltip"] {
   display: none !important;
   content: none !important;
+}
+/* =========================================================
+   Jsondown / Crepe Milkdown CodeBlock V0.2
+   命中真实 DOM：.milkdown-code-block
+   ========================================================= */
+
+/* 代码块外层：只保留一个统一背景 */
+.milkdown-host .milkdown-code-block {
+  position: relative !important;
+  margin: .85em 0 1em !important;
+
+  /* 顶部留给语言标签和复制按钮 */
+  padding: 2.2em 1.05em 1.05em !important;
+
+  background: #f7f7f8 !important;
+  border: 1px solid #ececef !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+
+  overflow: hidden !important;
+}
+
+/* 去掉 Crepe 默认内层背景 */
+.milkdown-host .milkdown-code-block,
+.milkdown-host .milkdown-code-block *,
+.milkdown-host .milkdown-code-block .codemirror-host,
+.milkdown-host .milkdown-code-block .cm-editor,
+.milkdown-host .milkdown-code-block .cm-scroller,
+.milkdown-host .milkdown-code-block .cm-content {
+  box-shadow: none !important;
+}
+
+/* CodeMirror 只透明，不再产生第二层背景 */
+.milkdown-host .milkdown-code-block .codemirror-host,
+.milkdown-host .milkdown-code-block .cm-editor,
+.milkdown-host .milkdown-code-block .cm-scroller,
+.milkdown-host .milkdown-code-block .cm-content,
+.milkdown-host .milkdown-code-block .cm-line {
+  background: transparent !important;
+}
+
+/* 代码字体 */
+.milkdown-host .milkdown-code-block .cm-editor,
+.milkdown-host .milkdown-code-block .cm-content,
+.milkdown-host .milkdown-code-block .cm-line {
+  color: #24292f !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace !important;
+  font-size: 12px !important;
+  line-height: 1.55 !important;
+}
+
+/* 去掉代码区域额外 padding */
+.milkdown-host .milkdown-code-block .codemirror-host {
+  padding: 0 !important;
+}
+
+.milkdown-host .milkdown-code-block .cm-scroller {
+  overflow: auto !important;
+  padding: 0 !important;
+}
+
+.milkdown-host .milkdown-code-block .cm-content {
+  padding: 0 !important;
+}
+
+.milkdown-host .milkdown-code-block .cm-line {
+  padding: 0 !important;
+}
+
+/* 去掉左侧数字、gutter、折叠栏 */
+.milkdown-host .milkdown-code-block .cm-gutters,
+.milkdown-host .milkdown-code-block .cm-lineNumbers,
+.milkdown-host .milkdown-code-block .cm-foldGutter,
+.milkdown-host .milkdown-code-block .cm-activeLineGutter {
+  display: none !important;
+}
+
+/* 去掉当前行背景、鼠标所在行阴影 */
+.milkdown-host .milkdown-code-block .cm-activeLine,
+.milkdown-host .milkdown-code-block .cm-line.cm-activeLine,
+.milkdown-host .milkdown-code-block .cm-focused .cm-activeLine {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 去掉选中匹配、搜索匹配之类的整行背景 */
+.milkdown-host .milkdown-code-block .cm-selectionMatch,
+.milkdown-host .milkdown-code-block .cm-matchingBracket,
+.milkdown-host .milkdown-code-block .cm-nonmatchingBracket {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 顶部工具栏固定在代码块内部 */
+.milkdown-host .milkdown-code-block .tools {
+  position: absolute !important;
+  left: 1.05em !important;
+  right: 1.05em !important;
+  top: .62em !important;
+
+  height: 18px !important;
+  min-height: 18px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* 左上角语言按钮：从下拉按钮改成静态语言标签 */
+.milkdown-host .milkdown-code-block .language-button {
+  display: inline-flex !important;
+  align-items: center !important;
+
+  height: 18px !important;
+  min-height: 18px !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+
+  color: #3f3f46 !important;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: .02em !important;
+  line-height: 18px !important;
+  text-transform: uppercase !important;
+
+  cursor: default !important;
+  pointer-events: none !important;
+}
+
+/* 去掉语言按钮里面的下拉箭头 */
+.milkdown-host .milkdown-code-block .language-button .expand-icon,
+.milkdown-host .milkdown-code-block .language-button svg {
+  display: none !important;
+}
+
+/* 彻底隐藏语言选择浮层 */
+.milkdown-host .milkdown-code-block .language-picker {
+  display: none !important;
+}
+
+/* 复制按钮组：默认隐藏 */
+.milkdown-host .milkdown-code-block .tools-button-group {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+
+  opacity: 0 !important;
+  transition: opacity .12s ease !important;
+}
+
+/* 鼠标进入代码块后才显示复制按钮 */
+.milkdown-host .milkdown-code-block:hover .tools-button-group {
+  opacity: 1 !important;
+}
+
+/* 复制按钮本体 */
+.milkdown-host .milkdown-code-block .tools-button-group button {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  border: 0 !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+
+  color: #303033 !important;
+  cursor: pointer !important;
+
+  /* 隐藏 Copy 文本 */
+  font-size: 0 !important;
+  line-height: 0 !important;
+
+  overflow: hidden !important;
+}
+
+/* 只保留复制 icon */
+.milkdown-host .milkdown-code-block .tools-button-group button svg {
+  width: 14px !important;
+  height: 14px !important;
+  display: block !important;
+}
+
+/* 如果按钮文字包在 span 里，直接隐藏 */
+.milkdown-host .milkdown-code-block .tools-button-group button span {
+  display: none !important;
+}
+
+.milkdown-host .milkdown-code-block .tools-button-group button:hover {
+  background: rgba(0, 0, 0, .06) !important;
+}
+
+/* JSON / CSS / Python 等语法颜色 */
+.milkdown-host .milkdown-code-block .cm-propertyName,
+.milkdown-host .milkdown-code-block .cm-def,
+.milkdown-host .milkdown-code-block .cm-attribute {
+  color: #8a5a2b !important;
+}
+
+.milkdown-host .milkdown-code-block .cm-string {
+  color: #d12f3f !important;
+}
+
+.milkdown-host .milkdown-code-block .cm-number,
+.milkdown-host .milkdown-code-block .cm-bool,
+.milkdown-host .milkdown-code-block .cm-null,
+.milkdown-host .milkdown-code-block .cm-keyword {
+  color: #9b4dca !important;
+}
+
+.milkdown-host .milkdown-code-block .cm-punctuation,
+.milkdown-host .milkdown-code-block .cm-bracket {
+  color: #24292f !important;
+}
+
+/* =========================================================
+   Code block chrome final override
+   1) 语言标签一直显示
+   2) 复制按钮：鼠标进入整个代码块显示，离开隐藏
+   3) 点击复制后显示 “✓ 已复制”
+   ========================================================= */
+
+.milkdown-host .milkdown-code-block .tools,
+.milkdown-host .milkdown-code-block .language-button {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.milkdown-host .milkdown-code-block .language-button {
+  display: inline-flex !important;
+  color: #111827 !important;
+  font-size: 11px !important;
+  font-weight: 650 !important;
+  text-transform: uppercase !important;
+}
+
+.milkdown-host .ProseMirror pre[data-jsondown-code-block="true"]::before,
+.milkdown-host .ProseMirror pre[data-language]::before,
+.milkdown-host .milkdown-code-block[data-jsondown-code-block="true"]::before,
+.milkdown-host .milkdown-code-block[data-language]::before {
+  content: attr(data-language) !important;
+  position: absolute !important;
+  top: 9px !important;
+  left: 12px !important;
+  z-index: 7 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  color: #111827 !important;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 650 !important;
+  line-height: 1 !important;
+  text-transform: uppercase !important;
+  pointer-events: none !important;
+}
+
+.milkdown-host .ProseMirror pre .jd-code-copy-button,
+.milkdown-host .milkdown-code-block > .jd-code-copy-button {
+  position: absolute !important;
+  top: 9px !important;
+  right: 12px !important;
+  z-index: 8 !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+
+  width: auto !important;
+  min-width: 26px !important;
+  height: 26px !important;
+  padding: 0 6px !important;
+
+  border: 0 !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+
+  color: #111827 !important;
+  font-size: 12px !important;
+  font-weight: 650 !important;
+  line-height: 1 !important;
+
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: none !important;
+  transition: opacity .12s ease, background .12s ease, color .12s ease !important;
+}
+
+.milkdown-host .ProseMirror pre:hover .jd-code-copy-button,
+.milkdown-host .milkdown-code-block:hover > .jd-code-copy-button,
+.milkdown-host .ProseMirror pre .jd-code-copy-button[data-copied="true"],
+.milkdown-host .milkdown-code-block > .jd-code-copy-button[data-copied="true"] {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.milkdown-host .ProseMirror pre .jd-code-copy-button:hover,
+.milkdown-host .milkdown-code-block > .jd-code-copy-button:hover {
+  background: rgba(17, 24, 39, .06) !important;
+  color: #030712 !important;
+}
+
+.milkdown-host .ProseMirror pre .jd-code-copy-icon,
+.milkdown-host .milkdown-code-block > .jd-code-copy-button .jd-code-copy-icon {
+  width: 15px !important;
+  height: 15px !important;
+  display: block !important;
+  flex: 0 0 auto !important;
+  color: currentColor !important;
+}
+
+.milkdown-host .ProseMirror pre .jd-code-copy-label,
+.milkdown-host .milkdown-code-block > .jd-code-copy-button .jd-code-copy-label {
+  display: none !important;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif !important;
+  white-space: nowrap !important;
+}
+
+.milkdown-host .ProseMirror pre .jd-code-copy-button[data-copied="true"],
+.milkdown-host .milkdown-code-block > .jd-code-copy-button[data-copied="true"] {
+  min-width: 72px !important;
+  padding: 0 9px !important;
+  background: #f8f8f7 !important;
+  box-shadow: 0 8px 22px rgba(17, 24, 39, .08) !important;
+  color: #111827 !important;
+}
+
+.milkdown-host .ProseMirror pre .jd-code-copy-button[data-copied="true"] .jd-code-copy-label,
+.milkdown-host .milkdown-code-block > .jd-code-copy-button[data-copied="true"] .jd-code-copy-label {
+  display: inline !important;
+}
+
+.milkdown-host .milkdown-code-block .tools-button-group {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.milkdown-host .milkdown-code-block .language-button,
+.milkdown-host .milkdown-code-block .language-picker {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.milkdown-host .milkdown-code-block:hover .tools-button-group {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.milkdown-host .milkdown-code-block .tools-button-group button,
+.milkdown-host .milkdown-code-block .tools-button-group button svg {
+  color: #111827 !important;
+  stroke: currentColor !important;
+}
+
+.milkdown-host .milkdown-code-block .tools-button-group button {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #111827 !important;
+}
+
+/* 最终兜底：Milkdown 原生代码块工具按钮也统一成 ChatGPT 式无外框轻按钮 */
+.milkdown-host .milkdown-code-block .tools-button-group button,
+.milkdown-host .milkdown-code-block .tools-button-group button:hover,
+.milkdown-host .milkdown-code-block .tools-button-group button:focus-visible {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #111827 !important;
+}
+
+.milkdown-host .milkdown-code-block .tools-button-group button:hover,
+.milkdown-host .milkdown-code-block .tools-button-group button:focus-visible {
+  background: rgba(17, 24, 39, .06) !important;
+}
+
+/* 最终兜底：编辑态和阅读态都只使用 Jsondown 注入的代码块按钮。
+   Milkdown/Crepe 原生 tools 容器在不同版本里类名会变，这里集中压掉。 */
+.milkdown-host .milkdown-code-block .tools,
+.milkdown-host .milkdown-code-block .tools *,
+.milkdown-host .milkdown-code-block .tools-button-group,
+.milkdown-host .milkdown-code-block .tools-button-group *,
+.milkdown-host .milkdown-code-block .language-button,
+.milkdown-host .milkdown-code-block .language-picker {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.milkdown-host .milkdown-code-block,
+.milkdown-host .ProseMirror pre[data-jsondown-code-block="true"] {
+  position: relative !important;
+}
+
+.milkdown-host .ProseMirror pre[data-jsondown-code-block="true"]::before,
+.milkdown-host .ProseMirror pre[data-language]::before,
+.milkdown-host .milkdown-code-block[data-jsondown-code-block="true"]::before,
+.milkdown-host .milkdown-code-block[data-language]::before {
+  content: attr(data-language) !important;
+  display: block !important;
+  position: absolute !important;
+  top: 9px !important;
+  left: 12px !important;
+  z-index: 8 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  color: #111827 !important;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  letter-spacing: .01em !important;
+  text-transform: uppercase !important;
+  pointer-events: none !important;
+}
+
+.milkdown-host .ProseMirror pre .jd-code-copy-button,
+.milkdown-host .milkdown-code-block > .jd-code-copy-button {
+  position: absolute !important;
+  top: 8px !important;
+  right: 10px !important;
+  z-index: 9 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  width: auto !important;
+  min-width: 28px !important;
+  height: 28px !important;
+  padding: 0 7px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #111827 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: none !important;
+  transition: opacity .12s ease, background .12s ease, color .12s ease, box-shadow .12s ease !important;
+}
+
+.milkdown-host .ProseMirror pre:hover .jd-code-copy-button,
+.milkdown-host .milkdown-code-block:hover > .jd-code-copy-button,
+.milkdown-host .ProseMirror pre .jd-code-copy-button[data-copied="true"],
+.milkdown-host .milkdown-code-block > .jd-code-copy-button[data-copied="true"] {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.milkdown-host .ProseMirror pre .jd-code-copy-button:hover,
+.milkdown-host .milkdown-code-block > .jd-code-copy-button:hover {
+  background: rgba(17, 24, 39, .07) !important;
+  color: #030712 !important;
+}
+
+.milkdown-host .ProseMirror pre .jd-code-copy-icon,
+.milkdown-host .milkdown-code-block > .jd-code-copy-button .jd-code-copy-icon {
+  width: 15px !important;
+  height: 15px !important;
+  color: currentColor !important;
+}
+
+.milkdown-host .ProseMirror pre .jd-code-copy-label,
+.milkdown-host .milkdown-code-block > .jd-code-copy-button .jd-code-copy-label {
+  display: none !important;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 650 !important;
+  white-space: nowrap !important;
+}
+
+.milkdown-host .ProseMirror pre .jd-code-copy-button[data-copied="true"],
+.milkdown-host .milkdown-code-block > .jd-code-copy-button[data-copied="true"] {
+  min-width: 76px !important;
+  padding: 0 10px !important;
+  background: #f8f8f7 !important;
+  box-shadow: 0 8px 22px rgba(17, 24, 39, .08) !important;
+  color: #111827 !important;
+}
+
+.milkdown-host .ProseMirror pre .jd-code-copy-button[data-copied="true"] .jd-code-copy-label,
+.milkdown-host .milkdown-code-block > .jd-code-copy-button[data-copied="true"] .jd-code-copy-label {
+  display: inline !important;
 }
