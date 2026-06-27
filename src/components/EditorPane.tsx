@@ -49,11 +49,12 @@ export function EditorPane() {
   const [jsonMenuOpen, setJsonMenuOpen] = useState(false)
   const [organizeResult, setOrganizeResult] = useState<MarkdownNormalizeResult | null>(null)
   const [organizing, setOrganizing] = useState(false)
+  const [editorVisualReadyFileId, setEditorVisualReadyFileId] = useState<string | null>(null)
   const jsonMenuRef = useRef<HTMLDivElement>(null)
   const saveTimer = useRef<number | undefined>(undefined)
   const editorScrollRef = useRef<HTMLDivElement>(null)
-  const pendingEditScrollTopRef = useRef<number | null>(null)
   const previousActiveFileIdRef = useRef<string | null>(null)
+  const lastUserScrollIntentAtRef = useRef(0)
 
   const allFiles = useMemo(
     () => folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id)),
@@ -65,6 +66,7 @@ export function EditorPane() {
   const isNewFileLocked = Boolean(pendingEmptyFile && !(contents[pendingEmptyFile.id] ?? '').trim())
   const readonlyEntry = file ? readonlyEntries[getReadonlyKey(file)] : undefined
   const isEditing = Boolean(file?.editable && editingFileId === file.id)
+  const editorVisualReady = Boolean(file?.editable && editorVisualReadyFileId === file.id)
   const isMarkdownFile = Boolean(file && ['md', 'markdown'].includes(file.extension.toLowerCase()))
   const isJsonFile = Boolean(file && file.extension.toLowerCase() === 'json')
 
@@ -72,27 +74,24 @@ export function EditorPane() {
     if (!file) return
     if (pendingEmptyFile?.id === file.id) {
       setEditingFileId(file.id)
+      void loadFileContent(file.id, file.path, file.kind)
       return
     }
     if (file.kind === 'image') {
       void loadFileContent(file.id, file.path, file.kind)
       return
     }
-    if (file.editable) {
-      void loadFileContent(file.id, file.path, file.kind)
-      return
-    }
-    if (!isEditing) void openReadonlyFile(file)
-  }, [file, isEditing, loadFileContent, openReadonlyFile, pendingEmptyFile?.id])
+    void openReadonlyFile(file)
+  }, [file, loadFileContent, openReadonlyFile, pendingEmptyFile?.id])
 
   useEffect(() => {
-    if (!file || isEditing || !readonlyEntry) return
+    if (!file || file.editable || isEditing || !readonlyEntry) return
     const scroll = editorScrollRef.current
     if (!scroll) return
     window.requestAnimationFrame(() => {
       scroll.scrollTop = readonlyEntry.scrollTop
     })
-  }, [file?.id, isEditing, readonlyEntry?.path])
+  }, [file?.id, isEditing, readonlyEntry?.path, readonlyEntry?.readonlyLoadedBytes])
 
   useEffect(() => {
     const previousActiveFileId = previousActiveFileIdRef.current
@@ -107,6 +106,7 @@ export function EditorPane() {
     if (previousActiveFileId !== activeFileId) {
       setEditingFileId(pendingEmptyFile?.id === activeFileId ? activeFileId : null)
       setEditorApi(null)
+      setEditorVisualReadyFileId(null)
     }
   }, [activeFileId, pendingEmptyFile?.id])
 
@@ -146,46 +146,13 @@ export function EditorPane() {
     })
   }
 
-  const logScrollMetrics = (label: string) => {
-    if (!import.meta.env.DEV) return
-    const scroll = editorScrollRef.current
-    if (!scroll) return
-    console.debug(`[scroll:${label}]`, {
-      scrollTop: scroll.scrollTop,
-      scrollHeight: scroll.scrollHeight,
-      clientHeight: scroll.clientHeight,
-      distanceToBottom: scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight,
-    })
-  }
-
   const enterEditing = () => {
     if (!file?.editable) return
-    logScrollMetrics('before-enter-editing')
-    pendingEditScrollTopRef.current = editorScrollRef.current?.scrollTop ?? null
+    setEditorVisualReadyFileId(null)
     void loadFileContent(file.id, file.path, file.kind).then(() => {
       setEditingFileId(file.id)
-      window.requestAnimationFrame(() => {
-        logScrollMetrics('after-editing-raf-1')
-        window.requestAnimationFrame(() => {
-          logScrollMetrics('after-editing-raf-2')
-        })
-      })
     })
   }
-
-  useEffect(() => {
-    if (!isEditing) return
-    const scrollTop = pendingEditScrollTopRef.current
-    if (scrollTop === null) return
-    pendingEditScrollTopRef.current = null
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        const scroll = editorScrollRef.current
-        if (!scroll) return
-        scroll.scrollTop = Math.min(scrollTop, Math.max(0, scroll.scrollHeight - scroll.clientHeight))
-      })
-    })
-  }, [isEditing, file?.id])
 
   const updateEditorContent = (id: string, markdown: string) => {
     const scroll = editorScrollRef.current
@@ -227,7 +194,10 @@ export function EditorPane() {
   }
 
   const handleOrganizeMarkdown = async () => {
-    if (!file || !isMarkdownFile || !fullContentLoaded) return
+    if (!file || !isMarkdownFile) return
+    if (!fullContentLoaded) {
+      await loadFileContent(file.id, file.path, file.kind)
+    }
     if (saveStatus === 'dirty') {
       const ok = await saveFileContent(file.id, file.path)
       if (!ok) {
@@ -236,7 +206,8 @@ export function EditorPane() {
       }
     }
 
-    const result = normalizeMarkdownForJsondown(contents[file.id] ?? '')
+    const latestContent = useEditorStore.getState().contents[file.id] ?? contents[file.id] ?? ''
+    const result = normalizeMarkdownForJsondown(latestContent)
     if (!result.changed) {
       showToast('当前文档已符合 Jsondown 格式')
       return
@@ -269,10 +240,18 @@ export function EditorPane() {
     const scroll = editorScrollRef.current
     if (!scroll || !file || isEditing || file.kind === 'image') return
     updateReadonlyScrollTop(file, scroll.scrollTop)
+
+    const isUserScroll = Date.now() - lastUserScrollIntentAtRef.current < 1500
+    if (!isUserScroll) return
+
     const distanceToBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight
-    if (distanceToBottom < scroll.clientHeight * 1.5) {
+    if (distanceToBottom < scroll.clientHeight * 3) {
       void loadNextReadonlyChunk(file)
     }
+  }
+
+  const markUserScrollIntent = () => {
+    lastUserScrollIntentAtRef.current = Date.now()
   }
 
   return (
@@ -308,7 +287,7 @@ export function EditorPane() {
             <button
               title="整理当前 Markdown 格式，不改写正文内容"
               aria-label="整理当前 Markdown"
-              disabled={!file || !isMarkdownFile || !fullContentLoaded || organizing}
+              disabled={!file || !isMarkdownFile || organizing}
               onClick={() => void handleOrganizeMarkdown()}
             >
               <span>整理</span>
@@ -338,32 +317,52 @@ export function EditorPane() {
           <p>Markdown 文件可以直接编辑，代码、文本与图片会以只读方式打开。</p>
         </div>
       ) : (
-        <div ref={editorScrollRef} className="editor-scroll" onScroll={handleEditorScroll}>
+        <div
+          ref={editorScrollRef}
+          className="editor-scroll"
+          onScroll={handleEditorScroll}
+          onWheelCapture={markUserScrollIntent}
+          onTouchMoveCapture={markUserScrollIntent}
+          onPointerDownCapture={markUserScrollIntent}
+        >
           <div className="note-created-time">{formatDisplayTime(file.createdAt ?? file.updatedAt ?? new Date().toISOString())}</div>
           {file.kind === 'image' ? (
             <ImagePreview src={content} name={file.name} />
           ) : (
             <article className="paper">
               {file.editable ? (
-                fullContentLoaded ? (
+                isEditing ? (
+                  fullContentLoaded ? (
                   <div
-                    className={`milkdown-mode-shell ${isEditing ? 'is-editing' : 'is-readonly'}`}
-                    title={!isEditing ? '点击正文进入编辑' : undefined}
-                    onClick={() => {
-                      if (!isEditing) enterEditing()
-                    }}
+                    className={[
+                      'milkdown-mode-shell',
+                      isEditing ? 'is-editing' : 'is-readonly',
+                      editorVisualReady ? 'is-visual-ready' : 'is-visual-loading',
+                    ].join(' ')}
                   >
+                    {!editorVisualReady && (
+                      <div className="readonly-skeleton milkdown-visual-skeleton">正在加载文档…</div>
+                    )}
                     <MilkdownEditor
                       key={file.id}
                       value={content}
                       readOnly={!isEditing}
                       autoFocusStart={pendingEmptyFile?.id === file.id}
                       onReady={setEditorApi}
+                      onVisualReady={() => setEditorVisualReadyFileId(file.id)}
                       onChange={(markdown) => updateEditorContent(file.id, markdown)}
                     />
                   </div>
+                  ) : (
+                    <div className="readonly-skeleton">正在加载完整编辑内容…</div>
+                  )
                 ) : (
-                  <div className="readonly-skeleton">正在加载文档…</div>
+                  <ReadonlyChunkViewer
+                    file={file}
+                    entry={readonlyEntry}
+                    editable={file.editable}
+                    onEnterEdit={enterEditing}
+                  />
                 )
               ) : (
                 <ReadonlyChunkViewer

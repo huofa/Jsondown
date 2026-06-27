@@ -585,6 +585,29 @@
   font-size: 13px;
 }
 .readonly-error { color: #a05f54; }
+
+.milkdown-mode-shell {
+  position: relative;
+}
+
+.milkdown-mode-shell.is-visual-loading .milkdown-host {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.milkdown-mode-shell.is-visual-ready .milkdown-host {
+  opacity: 1;
+}
+
+.milkdown-visual-skeleton {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  width: 100%;
+  pointer-events: none;
+}
+
 .readonly-plain-text {
   min-height: 360px;
   margin: 0;
@@ -602,6 +625,155 @@
   color: inherit;
   background: transparent;
   font: inherit;
+}
+
+.markdown-rendered-viewer {
+  max-width: 760px;
+  margin: 0;
+  color: #000;
+  font-family: ui-serif, "New York", "Iowan Old Style", "Songti SC", Georgia, serif;
+  font-size: var(--custom-editor-font-size);
+  line-height: var(--custom-editor-line-height);
+  letter-spacing: var(--custom-editor-letter-spacing);
+}
+.markdown-rendered-viewer > *:first-child { margin-top: 0; }
+.markdown-rendered-viewer p {
+  margin: 0 0 var(--custom-editor-paragraph-spacing);
+}
+.markdown-rendered-viewer h1,
+.markdown-rendered-viewer h2,
+.markdown-rendered-viewer h3,
+.markdown-rendered-viewer h4,
+.markdown-rendered-viewer h5,
+.markdown-rendered-viewer h6 {
+  margin: 0 0 .08em;
+  color: #000;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
+  font-weight: 760;
+  letter-spacing: -.025em;
+}
+.markdown-rendered-viewer h1 { font-size: 24px; line-height: 1.08; }
+.markdown-rendered-viewer h2 { font-size: 20px; line-height: 1.1; }
+.markdown-rendered-viewer h3 { font-size: 16px; line-height: 1.12; }
+.markdown-rendered-viewer h4,
+.markdown-rendered-viewer h5,
+.markdown-rendered-viewer h6 { font-size: 13px; line-height: 1.18; }
+.markdown-rendered-viewer ul,
+.markdown-rendered-viewer ol {
+  margin: .08em 0 .18em;
+  padding-left: 1.1em;
+}
+.markdown-rendered-viewer li {
+  margin: .06em 0;
+  padding-left: 0;
+}
+.markdown-rendered-viewer .contains-task-list {
+  padding-left: 0;
+  list-style: none;
+}
+.markdown-rendered-viewer .task-list-item {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+.markdown-rendered-viewer .task-list-item input {
+  width: 12px;
+  height: 12px;
+  margin: 0 -1px 0 0;
+  transform: translateY(1px);
+}
+.markdown-rendered-viewer blockquote {
+  margin: .35em 0;
+  padding: .08em 0 .08em .55em;
+  border-left: 2px solid rgba(150,122,82,.38);
+  color: #111;
+  background: transparent;
+}
+.markdown-rendered-viewer blockquote p {
+  margin: 0;
+}
+.markdown-rendered-viewer hr {
+  margin: .45em 0;
+  border: 0;
+  border-top: 1px solid rgba(70,62,52,.14);
+}
+.markdown-rendered-viewer code {
+  padding: .08em .24em;
+  border-radius: 4px;
+  background: rgba(100,87,68,.08);
+  font: .9em ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.markdown-code-block {
+  position: relative;
+  margin: .55em 0 .75em;
+  padding: 26px 14px 14px;
+  border: 1px solid rgba(17,24,39,.08);
+  border-radius: 10px;
+  background: #f8f8f7;
+}
+.markdown-code-block pre {
+  margin: 0;
+  overflow: auto;
+  color: #111827;
+  background: transparent;
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre;
+}
+.markdown-code-block code {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+}
+.markdown-code-language {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  color: #111827;
+  font: 650 11px/1 ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+}
+.markdown-code-copy-button {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 26px;
+  height: 24px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 7px;
+  color: #111827;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+  cursor: pointer;
+  transition: opacity .12s ease, background .12s ease;
+}
+.markdown-code-block:hover .markdown-code-copy-button,
+.markdown-code-copy-button:focus-visible,
+.markdown-code-copy-button[data-copied="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+.markdown-code-copy-button:hover {
+  background: rgba(17,24,39,.06);
+}
+.markdown-code-copy-button svg {
+  width: 15px;
+  height: 15px;
+}
+.markdown-code-copy-button span {
+  font-size: 11px;
+  font-weight: 650;
+}
+.markdown-code-copy-button[data-copied="true"] {
+  min-width: 72px;
+  padding: 0 10px;
+  background: #f8f8f7;
+  box-shadow: 0 8px 22px rgba(17,24,39,.08);
 }
 
 /* Menus and dialogs */
@@ -681,3 +853,345 @@
 
 .density-loose .top-editor-toolbar { height: 34px; }
 .density-loose .top-editor-toolbar button { width: 27px; height: 27px; }
+/* ================================
+   Jsondown / Milkdown Code Block
+   ChatGPT-like code block style
+================================ */
+
+/* 代码块外层 */
+.editor-shell .ProseMirror pre,
+.milkdown .ProseMirror pre {
+  position: relative;
+  margin: 14px 0;
+  padding: 44px 16px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: #f7f7f8;
+  color: #0f172a;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.7;
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    "Liberation Mono",
+    "Courier New",
+    monospace;
+}
+
+/* 代码内容 */
+.editor-shell .ProseMirror pre code,
+.milkdown .ProseMirror pre code {
+  display: block;
+  white-space: pre;
+  background: transparent;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  color: inherit;
+}
+
+/* 左上角语言标签：永远显示 */
+.editor-shell .ProseMirror pre::before,
+.milkdown .ProseMirror pre::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  z-index: 2;
+  display: block;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 1;
+  pointer-events: none;
+}
+
+/* 没有语言时默认显示 TEXT */
+.editor-shell .ProseMirror pre:not([data-language])::before,
+.editor-shell .ProseMirror pre[data-language=""]::before,
+.milkdown .ProseMirror pre:not([data-language])::before,
+.milkdown .ProseMirror pre[data-language=""]::before {
+  content: "TEXT";
+}
+
+/* 右上角复制按钮基础样式 */
+.editor-shell .ProseMirror pre .code-copy-button,
+.editor-shell .ProseMirror pre .copy-button,
+.editor-shell .ProseMirror pre button[data-code-copy],
+.milkdown .ProseMirror pre .code-copy-button,
+.milkdown .ProseMirror pre .copy-button,
+.milkdown .ProseMirror pre button[data-code-copy] {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 3;
+
+  height: 28px;
+  min-width: 54px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(209, 213, 219, 0.9);
+  background: rgba(255, 255, 255, 0.92);
+  color: #374151;
+
+  font-size: 12px;
+  line-height: 28px;
+  font-weight: 500;
+
+  opacity: 0;
+  transform: translateY(-2px);
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease,
+    background 0.12s ease,
+    border-color 0.12s ease;
+  cursor: pointer;
+}
+
+/* 关键：鼠标进入整个代码块，就显示复制按钮 */
+.editor-shell .ProseMirror pre:hover .code-copy-button,
+.editor-shell .ProseMirror pre:hover .copy-button,
+.editor-shell .ProseMirror pre:hover button[data-code-copy],
+.milkdown .ProseMirror pre:hover .code-copy-button,
+.milkdown .ProseMirror pre:hover .copy-button,
+.milkdown .ProseMirror pre:hover button[data-code-copy] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 按钮自身 hover，保持 ChatGPT 类似质感 */
+.editor-shell .ProseMirror pre .code-copy-button:hover,
+.editor-shell .ProseMirror pre .copy-button:hover,
+.editor-shell .ProseMirror pre button[data-code-copy]:hover,
+.milkdown .ProseMirror pre .code-copy-button:hover,
+.milkdown .ProseMirror pre .copy-button:hover,
+.milkdown .ProseMirror pre button[data-code-copy]:hover {
+  background: #ffffff;
+  border-color: rgba(156, 163, 175, 0.95);
+  color: #111827;
+}
+
+/* 代码块选中色：天蓝色 */
+.editor-shell .ProseMirror pre ::selection,
+.milkdown .ProseMirror pre ::selection {
+  background: #bfe3ff;
+  color: inherit;
+}
+
+/* 全编辑器选中色，也可以轻一点 */
+.editor-shell .ProseMirror ::selection,
+.milkdown .ProseMirror ::selection {
+  background: #d7ecff;
+  color: inherit;
+}
+
+/* CodeMirror 内部选区，如果 Milkdown code block 使用了 CM */
+.editor-shell .cm-selectionBackground,
+.milkdown .cm-selectionBackground {
+  background: #bfe3ff !important;
+}
+
+.editor-shell .cm-focused .cm-selectionBackground,
+.milkdown .cm-focused .cm-selectionBackground {
+  background: #bfe3ff !important;
+}
+/* Jsondown code block chrome: language label + copy button */
+.editor-shell .ProseMirror pre,
+.milkdown-host .ProseMirror pre,
+.milkdown .ProseMirror pre {
+  position: relative;
+}
+
+/* 左上角语言标签：一直显示 */
+.editor-shell .ProseMirror pre[data-jsondown-code-block="true"]::before,
+.milkdown-host .ProseMirror pre[data-jsondown-code-block="true"]::before,
+.milkdown .ProseMirror pre[data-jsondown-code-block="true"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  z-index: 2;
+  display: block;
+  color: #111827;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  pointer-events: none;
+  opacity: 1;
+}
+
+/* 没有语言时，视觉兜底显示 TEXT */
+.editor-shell .ProseMirror pre[data-jsondown-code-block="true"]:not([data-language])::before,
+.editor-shell .ProseMirror pre[data-jsondown-code-block="true"][data-language=""]::before,
+.milkdown-host .ProseMirror pre[data-jsondown-code-block="true"]:not([data-language])::before,
+.milkdown-host .ProseMirror pre[data-jsondown-code-block="true"][data-language=""]::before,
+.milkdown .ProseMirror pre[data-jsondown-code-block="true"]:not([data-language])::before,
+.milkdown .ProseMirror pre[data-jsondown-code-block="true"][data-language=""]::before {
+  content: "TEXT";
+}
+
+/* 复制按钮：默认隐藏，鼠标进入代码块就显示 */
+.editor-shell .ProseMirror pre .jd-code-copy-button,
+.milkdown-host .ProseMirror pre .jd-code-copy-button,
+.milkdown .ProseMirror pre .jd-code-copy-button {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 3;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(209, 213, 219, 0.85);
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 26px;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s ease,
+    background 0.14s ease,
+    border-color 0.14s ease,
+    color 0.14s ease;
+  user-select: none;
+}
+
+/* 只要鼠标在代码块内，就显示复制按钮 */
+.editor-shell .ProseMirror pre:hover .jd-code-copy-button,
+.milkdown-host .ProseMirror pre:hover .jd-code-copy-button,
+.milkdown .ProseMirror pre:hover .jd-code-copy-button {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.editor-shell .ProseMirror pre .jd-code-copy-button:hover,
+.milkdown-host .ProseMirror pre .jd-code-copy-button:hover,
+.milkdown .ProseMirror pre .jd-code-copy-button:hover {
+  background: #ffffff;
+  border-color: rgba(156, 163, 175, 0.95);
+  color: #111827;
+}
+
+/* 防止旧的语言节点/插件语言提示影响显示 */
+.milkdown-host .ProseMirror pre [data-language],
+.editor-shell .ProseMirror pre [data-language],
+.milkdown .ProseMirror pre [data-language] {
+  pointer-events: none;
+}
+.editor-shell .milkdown-host pre,
+.editor-shell .milkdown .ProseMirror pre,
+.milkdown-host .ProseMirror pre {
+  position: relative;
+}
+
+/* 左上角语言标签：始终显示 */
+.editor-shell .milkdown-host pre[data-language]::before,
+.editor-shell .milkdown .ProseMirror pre[data-language]::before,
+.milkdown-host .ProseMirror pre[data-language]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  z-index: 2;
+  display: block;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+  pointer-events: none;
+}
+
+/* 给语言标签留出空间 */
+.editor-shell .milkdown-host pre[data-language],
+.editor-shell .milkdown .ProseMirror pre[data-language],
+.milkdown-host .ProseMirror pre[data-language] {
+  padding-top: 42px;
+}
+
+/* 复制按钮：鼠标进入代码块就显示 */
+.editor-shell .milkdown-host pre .jd-code-copy-button,
+.editor-shell .milkdown .ProseMirror pre .jd-code-copy-button,
+.milkdown-host .ProseMirror pre .jd-code-copy-button {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 5;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid #d9d9e3;
+
+  background: #ffffff;
+  color: #353740;
+
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+
+  opacity: 0;
+  pointer-events: none;
+  cursor: pointer;
+
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: opacity 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+
+.editor-shell .milkdown-host pre:hover .jd-code-copy-button,
+.editor-shell .milkdown .ProseMirror pre:hover .jd-code-copy-button,
+.milkdown-host .ProseMirror pre:hover .jd-code-copy-button {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.editor-shell .milkdown-host pre .jd-code-copy-button:hover,
+.editor-shell .milkdown .ProseMirror pre .jd-code-copy-button:hover,
+.milkdown-host .ProseMirror pre .jd-code-copy-button:hover {
+  background: #f7f7f8;
+  border-color: #c5c5d2;
+}
+
+/* 最终收口：编辑态代码复制按钮走无外框、块内 hover 显示的 ChatGPT 式轻按钮 */
+.editor-shell .milkdown-host pre .jd-code-copy-button,
+.editor-shell .milkdown .ProseMirror pre .jd-code-copy-button,
+.milkdown-host .ProseMirror pre .jd-code-copy-button {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #111827 !important;
+  transform: none !important;
+}
+
+.editor-shell .milkdown-host pre .jd-code-copy-button:hover,
+.editor-shell .milkdown .ProseMirror pre .jd-code-copy-button:hover,
+.milkdown-host .ProseMirror pre .jd-code-copy-button:hover {
+  background: rgba(17, 24, 39, .06) !important;
+  color: #030712 !important;
+}
+
+.editor-shell .milkdown-host pre .jd-code-copy-button[data-copied="true"],
+.editor-shell .milkdown .ProseMirror pre .jd-code-copy-button[data-copied="true"],
+.milkdown-host .ProseMirror pre .jd-code-copy-button[data-copied="true"] {
+  min-width: 72px !important;
+  padding: 0 10px !important;
+  background: #f8f8f7 !important;
+  box-shadow: 0 8px 22px rgba(17, 24, 39, .08) !important;
+}
