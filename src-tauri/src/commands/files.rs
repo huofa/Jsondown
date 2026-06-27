@@ -377,6 +377,49 @@ pub fn write_text_file(path: String, content: String) -> Result<SaveResult, Stri
 }
 
 #[tauri::command]
+pub fn backup_text_file(path: String) -> Result<String, String> {
+    let path_ref = Path::new(&path);
+    if !path_ref.exists() || !path_ref.is_file() {
+        return Err("要备份的文件不存在".to_string());
+    }
+    if should_ignore(path_ref) || !is_supported_text_file(path_ref) {
+        return Err("该文件不允许备份".to_string());
+    }
+
+    let parent = path_ref.parent().ok_or_else(|| "无法获取文件父路径".to_string())?;
+    let backup_dir = parent.join(".jsondown-backup");
+    fs::create_dir_all(&backup_dir).map_err(|err| err.to_string())?;
+
+    let stem = path_ref
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("backup");
+    let ext = path_ref.extension().and_then(|value| value.to_str());
+    let timestamp = Local::now().format("%Y%m%d-%H%M%S").to_string();
+    let file_name = match ext {
+        Some(ext) => format!("{stem}.{timestamp}.{ext}"),
+        None => format!("{stem}.{timestamp}"),
+    };
+    let mut backup_path = backup_dir.join(file_name);
+    for index in 1..1000 {
+        if !backup_path.exists() {
+            break;
+        }
+        let file_name = match ext {
+            Some(ext) => format!("{stem}.{timestamp}-{index}.{ext}"),
+            None => format!("{stem}.{timestamp}-{index}"),
+        };
+        backup_path = backup_dir.join(file_name);
+    }
+    if backup_path.exists() {
+        return Err("无法生成唯一备份文件名".to_string());
+    }
+
+    fs::copy(path_ref, &backup_path).map_err(|err| err.to_string())?;
+    Ok(path_to_string(&backup_path))
+}
+
+#[tauri::command]
 pub fn create_file(parent_path: String, file_name: String) -> Result<FileTreeNode, String> {
     let name = ensure_child_name(&file_name, Some("md"));
     let path = Path::new(&parent_path).join(name);

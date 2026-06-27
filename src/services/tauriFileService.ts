@@ -181,6 +181,11 @@ export async function writeTextFile(path: string, content: string): Promise<Save
   }
 }
 
+export async function backupTextFile(path: string): Promise<string | null> {
+  if (!isTauriRuntime()) return null
+  return invoke<string>('backup_text_file', { path })
+}
+
 export async function revealInFinder(path: string): Promise<void> {
   if (!isTauriRuntime()) return
   return invoke<void>('reveal_in_finder', { path })
