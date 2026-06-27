@@ -4,10 +4,11 @@ import { useEditorStore } from '../stores/editorStore'
 import { useOpenedFileCacheStore } from '../stores/openedFileCacheStore'
 import { useRootFolderStore } from '../stores/rootFolderStore'
 import { useThemeStore } from '../stores/themeStore'
-import { revealInFinder } from '../services/tauriFileService'
+import { backupTextFile, revealInFinder, writeTextFile } from '../services/tauriFileService'
 import type { EditorCommandApi } from '../types/editorCommand'
 import { flattenFiles } from '../utils/flattenFiles'
 import { formatDisplayTime } from '../utils/formatDisplayTime'
+import { normalizeMarkdownForJsondown, type MarkdownNormalizeResult } from '../utils/markdownNormalize'
 import { startWindowDrag } from '../utils/windowDrag'
 import { ImagePreview } from './ImagePreview'
 import { MilkdownEditor } from './MilkdownEditor'
@@ -17,13 +18,23 @@ import { ThemeSwitcher } from './ThemeSwitcher'
 import { ToastHost, showToast } from './Toast'
 import { TopEditorToolbar } from './TopEditorToolbar'
 import { LayoutDensitySwitcher } from './LayoutDensitySwitcher'
+import { MarkdownOrganizeDialog } from './MarkdownOrganizeDialog'
 import { SidebarCollapseButton } from './SidebarCollapseButton'
 
 export function EditorPane() {
   const folders = useRootFolderStore((state) => state.folders)
   const activeFolderId = useRootFolderStore((state) => state.activeFolderId)
   const createMockDocument = useRootFolderStore((state) => state.createMockDocument)
-  const { activeFileId, contents, loadedPaths, pendingEmptyFile, saveStatus, requestOpenFile, updateContent } = useEditorStore()
+  const {
+    activeFileId,
+    contents,
+    loadedPaths,
+    pendingEmptyFile,
+    saveStatus,
+    requestOpenFile,
+    updateContent,
+    replaceContentAsSaved,
+  } = useEditorStore()
   const loadFileContent = useEditorStore((state) => state.loadFileContent)
   const saveFileContent = useEditorStore((state) => state.saveFileContent)
   const readonlyEntries = useOpenedFileCacheStore((state) => state.entries)
@@ -34,6 +45,10 @@ export function EditorPane() {
   const theme = useThemeStore((state) => state.theme)
   const [editorApi, setEditorApi] = useState<EditorCommandApi | null>(null)
   const [editingFileId, setEditingFileId] = useState<string | null>(null)
+  const [jsonMenuOpen, setJsonMenuOpen] = useState(false)
+  const [organizeResult, setOrganizeResult] = useState<MarkdownNormalizeResult | null>(null)
+  const [organizing, setOrganizing] = useState(false)
+  const jsonMenuRef = useRef<HTMLDivElement>(null)
   const saveTimer = useRef<number | undefined>(undefined)
   const editorScrollRef = useRef<HTMLDivElement>(null)
   const pendingEditScrollTopRef = useRef<number | null>(null)
@@ -49,6 +64,8 @@ export function EditorPane() {
   const isNewFileLocked = Boolean(pendingEmptyFile && !(contents[pendingEmptyFile.id] ?? '').trim())
   const readonlyEntry = file ? readonlyEntries[getReadonlyKey(file)] : undefined
   const isEditing = Boolean(file?.editable && editingFileId === file.id)
+  const isMarkdownFile = Boolean(file && ['md', 'markdown'].includes(file.extension.toLowerCase()))
+  const isJsonFile = Boolean(file && file.extension.toLowerCase() === 'json')
 
   useEffect(() => {
     if (!file) return
@@ -104,6 +121,20 @@ export function EditorPane() {
   useEffect(() => () => {
     window.clearTimeout(saveTimer.current)
   }, [])
+
+  useEffect(() => {
+    if (!jsonMenuOpen) return
+    const close = (event: MouseEvent) => {
+      if (!jsonMenuRef.current?.contains(event.target as Node)) setJsonMenuOpen(false)
+    }
+    const closeOnBlur = () => setJsonMenuOpen(false)
+    window.addEventListener('mousedown', close)
+    window.addEventListener('blur', closeOnBlur)
+    return () => {
+      window.removeEventListener('mousedown', close)
+      window.removeEventListener('blur', closeOnBlur)
+    }
+  }, [jsonMenuOpen])
 
   const createDocument = () => {
     void createMockDocument(activeFolderId).then((id) => {
@@ -180,6 +211,56 @@ export function EditorPane() {
     window.requestAnimationFrame(restoreScroll)
   }
 
+  const handleJsonButton = () => {
+    if (!file) return
+    if (!isJsonFile) {
+      showToast('仅 JSON 文件可用')
+      return
+    }
+    setJsonMenuOpen((open) => !open)
+  }
+
+  const handleJsonPlaceholder = (label: string) => {
+    setJsonMenuOpen(false)
+    showToast(`${label} 后续开发中`)
+  }
+
+  const handleOrganizeMarkdown = async () => {
+    if (!file || !isMarkdownFile || !fullContentLoaded) return
+    if (saveStatus === 'dirty') {
+      const ok = await saveFileContent(file.id, file.path)
+      if (!ok) {
+        showToast('保存失败，暂不能整理')
+        return
+      }
+    }
+
+    const result = normalizeMarkdownForJsondown(contents[file.id] ?? '')
+    if (!result.changed) {
+      showToast('当前文档已符合 Jsondown 格式')
+      return
+    }
+    setOrganizeResult(result)
+  }
+
+  const applyMarkdownOrganize = async () => {
+    if (!file || !organizeResult) return
+    setOrganizing(true)
+    try {
+      await backupTextFile(file.path)
+      const result = await writeTextFile(file.path, organizeResult.markdown)
+      if (!result.ok) throw new Error('write failed')
+      replaceContentAsSaved(file.id, file.path, organizeResult.markdown, result.updatedAt ?? result.savedAt)
+      setOrganizeResult(null)
+      showToast('已整理 Markdown，原文件已备份')
+    } catch (error) {
+      if (import.meta.env.DEV) console.warn('[markdown:organize-failed]', error)
+      showToast('整理失败，原文件未被覆盖')
+    } finally {
+      setOrganizing(false)
+    }
+  }
+
   const handleEditorScroll = () => {
     const scroll = editorScrollRef.current
     if (!scroll || !file || isEditing || file.kind === 'image') return
@@ -205,7 +286,30 @@ export function EditorPane() {
         </button>
         <TopEditorToolbar api={editorApi} disabled={!file?.editable || !isEditing} />
         <div className="editor-actions">
+          <div className="density-switcher json-tools" ref={jsonMenuRef}>
+            <button title="JSON 工具" aria-label="JSON 工具" disabled={!file} onClick={handleJsonButton}>
+              <span>JSON</span>
+            </button>
+            {jsonMenuOpen && (
+              <div className="density-menu json-tools-menu">
+                <button onClick={() => handleJsonPlaceholder('JSON 格式化')}>JSON 格式化</button>
+                <button onClick={() => handleJsonPlaceholder('JSON 校验')}>JSON 校验</button>
+                <button onClick={() => handleJsonPlaceholder('JSON 压缩')}>JSON 压缩</button>
+                <button disabled>后续开发中</button>
+              </div>
+            )}
+          </div>
           {file?.editable && <SaveStatus status={saveStatus} />}
+          <div className="density-switcher markdown-organize-button">
+            <button
+              title="整理当前 Markdown 格式，不改写正文内容"
+              aria-label="整理当前 Markdown"
+              disabled={!file || !isMarkdownFile || !fullContentLoaded || organizing}
+              onClick={() => void handleOrganizeMarkdown()}
+            >
+              <span>整理</span>
+            </button>
+          </div>
           <LayoutDensitySwitcher />
           <ThemeSwitcher />
           <button
@@ -268,6 +372,14 @@ export function EditorPane() {
             </article>
           )}
         </div>
+      )}
+      {organizeResult && (
+        <MarkdownOrganizeDialog
+          changes={organizeResult.changes}
+          warnings={organizeResult.warnings}
+          onCancel={() => setOrganizeResult(null)}
+          onApply={() => void applyMarkdownOrganize()}
+        />
       )}
       <ToastHost />
     </div>

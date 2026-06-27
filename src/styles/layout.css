@@ -631,6 +631,34 @@
 .dialog-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 18px; }
 .dialog-actions button { min-width: 62px; height: 28px; border: 1px solid #d8d3cb; border-radius: 6px; background: #fff; font-size: 11px; cursor: pointer; }
 .dialog-actions button.primary { border-color: #a98a5a; color: white; background: #a98a5a; }
+.markdown-organize-dialog { width: 410px; }
+.native-dialog .dialog-description { margin-bottom: 12px; }
+.organize-section {
+  margin-top: 10px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  color: #6b6258;
+  background: rgba(238,234,228,.64);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.organize-section strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #3f382f;
+  font-size: 11px;
+}
+.organize-section ul {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.organize-section li + li { margin-top: 3px; }
+.organize-warnings { background: rgba(245,224,182,.54); }
+.organize-safe-list p {
+  margin: 0;
+  color: #7c746b;
+  font-size: 10.5px;
+}
 
 @media (max-width: 1120px) {
   .save-status, .theme-switcher { display: none; }

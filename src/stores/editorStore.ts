@@ -36,6 +36,7 @@ type EditorState = {
   saveFileContent: (id: string, path: string) => Promise<boolean>
   updateContent: (id: string, content: string) => void
   addContent: (id: string, content: string) => void
+  replaceContentAsSaved: (id: string, path: string, content: string, savedAt?: string) => void
   removeContent: (id: string) => void
   setSaveStatus: (status: SaveStatus) => void
   markSaved: (savedAt?: string) => void
@@ -216,6 +217,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   addContent: (id, content) =>
     set((state) => ({ contents: { ...state.contents, [id]: content } })),
+  replaceContentAsSaved: (id, path, content, savedAt = new Date().toISOString()) => {
+    set((state) => ({
+      contents: { ...state.contents, [id]: content },
+      savedContents: { ...state.savedContents, [id]: content },
+      loadedPaths: { ...state.loadedPaths, [id]: path },
+      saveStatus: state.activeFileId === id ? 'saved' : state.saveStatus,
+      savedAt: state.activeFileId === id ? savedAt : state.savedAt,
+    }))
+    useOpenedFileCacheStore.getState().invalidatePath(path)
+    useFilePreviewStore.getState().removePreview(path)
+    window.dispatchEvent(new CustomEvent('jsondown:file-saved', {
+      detail: { path, updatedAt: savedAt, size: content.length },
+    }))
+  },
   removeContent: (id) =>
     set((state) => {
       const contents = { ...state.contents }

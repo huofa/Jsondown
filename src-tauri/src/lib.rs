@@ -5,8 +5,8 @@ mod utils;
 use commands::{
     config::{load_app_config, save_app_config},
     files::{
-        create_file, create_unique_markdown_file, delete_empty_file_if_exists, read_file_preview,
-        read_file_chunk, read_text_file, rename_path, write_text_file,
+        backup_text_file, create_file, create_unique_markdown_file, delete_empty_file_if_exists,
+        read_file_preview, read_file_chunk, read_text_file, rename_path, write_text_file,
     },
     finder::reveal_in_finder,
     folders::{
@@ -32,6 +32,7 @@ pub fn run() {
             read_file_chunk,
             read_text_file,
             write_text_file,
+            backup_text_file,
             reveal_in_finder,
             load_app_config,
             save_app_config,
