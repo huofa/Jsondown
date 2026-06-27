@@ -36,6 +36,7 @@ const changeDescriptions: Record<string, string> = {
   headingLevel: '标题层级压缩为 Jsondown 四档标题',
   headingSyntax: '清理标题多余符号',
   headingHierarchy: '按正文结构压缩标题层级',
+  falseCodeFence: '普通说明文字代码块转回 Markdown 正文',
   separator: '超长分割线转为 ---',
   emptyLines: '连续空行压缩',
   spanStyle: '清理 span 中非 Jsondown 标准样式',
@@ -332,6 +333,60 @@ function compressEmptyLines(lines: ProcessedLine[], changes: Counter) {
   return result
 }
 
+const nonCodeFenceLanguages = new Set(['', 'text', 'txt', 'plain', 'plaintext', 'md', 'markdown'])
+
+function getFenceInfo(line: string) {
+  const match = line.match(/^\s*(```|~~~)\s*([A-Za-z0-9_-]+)?/)
+  if (!match) return null
+  return {
+    marker: match[1],
+    language: (match[2] ?? '').trim().toLowerCase(),
+  }
+}
+
+function isProbablyJson(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed || !/^[{[]/.test(trimmed)) return false
+  try {
+    JSON.parse(trimmed)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function isRealCodeFence(openingLine: string, contentLines: string[]) {
+  const info = getFenceInfo(openingLine)
+  if (!info) return false
+
+  const language = info.language
+  const content = contentLines.join('\n')
+
+  if (language === 'json' || isProbablyJson(content)) return true
+  if (!nonCodeFenceLanguages.has(language)) return true
+
+  const nonEmptyLines = contentLines.map((line) => line.trim()).filter(Boolean)
+  if (nonEmptyLines.length === 0) return false
+
+  const codeSignals = [
+    /^\s*(import|export|const|let|var|function|class|return|if|for|while|try|catch|switch)\b/m,
+    /^\s*(def|class|from|import|return|if|for|while|try|except|with)\b/m,
+    /^\s*(fn|pub|use|impl|let|match|enum|struct|trait)\b/m,
+    /^\s*(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP)\b/im,
+    /=>|==={0,1}|!==?|&&|\|\||[{};]/,
+    /^\s*[$>]\s+\w+/m,
+  ]
+
+  if (codeSignals.some((pattern) => pattern.test(content))) return true
+
+  const symbolHeavyLineCount = nonEmptyLines.filter((line) => {
+    const symbolCount = (line.match(/[{}()[\];=<>/\\|]/g) ?? []).length
+    return symbolCount >= Math.max(2, Math.ceil(line.length * 0.12))
+  }).length
+
+  return symbolHeavyLineCount >= Math.max(2, Math.ceil(nonEmptyLines.length * 0.45))
+}
+
 export function normalizeMarkdownForJsondown(input: string): MarkdownNormalizeResult {
   const changes: Counter = {}
   const warnings: Counter = {}
@@ -340,7 +395,6 @@ export function normalizeMarkdownForJsondown(input: string): MarkdownNormalizeRe
 
   const lines = normalizedInput.split('\n')
   const processed: ProcessedLine[] = []
-  let inFence = false
   let inFrontMatter = false
 
   for (let index = 0; index < lines.length; index += 1) {
@@ -359,14 +413,35 @@ export function normalizeMarkdownForJsondown(input: string): MarkdownNormalizeRe
       continue
     }
 
-    if (/^\s*```/.test(line)) {
-      inFence = !inFence
-      processed.push({ text: line, protected: true })
-      continue
-    }
+    if (getFenceInfo(line)) {
+      const fenceInfo = getFenceInfo(line)
+      const blockLines = [line]
+      const contentLines: string[] = []
+      let closingIndex = -1
 
-    if (inFence) {
-      processed.push({ text: line, protected: true })
+      for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+        const candidate = lines[cursor]
+        if (candidate.trim().startsWith(fenceInfo?.marker ?? '```')) {
+          blockLines.push(candidate)
+          closingIndex = cursor
+          break
+        }
+        blockLines.push(candidate)
+        contentLines.push(candidate)
+      }
+
+      if (closingIndex === -1 || isRealCodeFence(line, contentLines)) {
+        blockLines.forEach((blockLine) => processed.push({ text: blockLine, protected: true }))
+        if (closingIndex !== -1) index = closingIndex
+        else index = lines.length
+        continue
+      }
+
+      add(changes, 'falseCodeFence')
+      contentLines.forEach((contentLine) => {
+        processed.push(normalizeEditableLine(contentLine, processed.length, changes, warnings))
+      })
+      index = closingIndex
       continue
     }
 

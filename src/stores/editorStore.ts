@@ -33,6 +33,7 @@ type EditorState = {
   discardPendingEmptyFile: () => Promise<boolean>
   runAfterPendingCleanup: (nextAction: () => void | Promise<void>) => Promise<void>
   loadFileContent: (id: string, path: string, kind?: string) => Promise<void>
+  reloadFileContent: (id: string, path: string, kind?: string) => Promise<void>
   saveFileContent: (id: string, path: string) => Promise<boolean>
   updateContent: (id: string, content: string) => void
   addContent: (id: string, content: string) => void
@@ -164,6 +165,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     } catch {
       set({ saveStatus: 'error' })
     }
+  },
+  reloadFileContent: async (id, path, kind) => {
+    set((state) => {
+      const contents = { ...state.contents }
+      const loadedPaths = { ...state.loadedPaths }
+      delete contents[id]
+      delete loadedPaths[id]
+      return {
+        contents,
+        loadedPaths,
+        saveStatus: state.activeFileId === id ? 'idle' : state.saveStatus,
+      }
+    })
+    await get().loadFileContent(id, path, kind)
   },
   saveFileContent: async (id, path) => {
     const content = get().contents[id] ?? ''

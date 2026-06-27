@@ -34,6 +34,7 @@ export function EditorPane() {
     requestOpenFile,
     updateContent,
     replaceContentAsSaved,
+    reloadFileContent,
   } = useEditorStore()
   const loadFileContent = useEditorStore((state) => state.loadFileContent)
   const saveFileContent = useEditorStore((state) => state.saveFileContent)
@@ -251,6 +252,9 @@ export function EditorPane() {
       const result = await writeTextFile(file.path, organizeResult.markdown)
       if (!result.ok) throw new Error('write failed')
       replaceContentAsSaved(file.id, file.path, organizeResult.markdown, result.updatedAt ?? result.savedAt)
+      setEditingFileId(null)
+      setEditorApi(null)
+      await reloadFileContent(file.id, file.path, file.kind)
       setOrganizeResult(null)
       showToast('已整理 Markdown，原文件已备份')
     } catch (error) {
