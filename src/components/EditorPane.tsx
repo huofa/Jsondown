@@ -1,5 +1,6 @@
 import { FileQuestion, FolderOpen, MoreHorizontal, SquarePen } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useEditorStore } from '../stores/editorStore'
 import { useOpenedFileCacheStore } from '../stores/openedFileCacheStore'
 import { useRootFolderStore } from '../stores/rootFolderStore'
@@ -82,8 +83,12 @@ export function EditorPane() {
       void loadFileContent(file.id, file.path, file.kind)
       return
     }
+    if (file.editable && isMarkdownFile) {
+      void loadFileContent(file.id, file.path, file.kind)
+      return
+    }
     void openReadonlyFile(file)
-  }, [file, loadFileContent, openReadonlyFile, pendingEmptyFile?.id])
+  }, [file, isMarkdownFile, loadFileContent, openReadonlyFile, pendingEmptyFile?.id])
 
   useEffect(() => {
     if (!file || file.editable || isEditing || !readonlyEntry) return
@@ -332,15 +337,21 @@ export function EditorPane() {
             <ImagePreview src={content} name={file.name} />
           ) : (
             <article className="paper">
-              {file.editable ? (
-                isEditing ? (
-                  fullContentLoaded ? (
+              {file.editable && isMarkdownFile ? (
+                fullContentLoaded ? (
                   <div
                     className={[
                       'milkdown-mode-shell',
                       isEditing ? 'is-editing' : 'is-readonly',
                       editorVisualReady ? 'is-visual-ready' : 'is-visual-loading',
                     ].join(' ')}
+                    onMouseDownCapture={() => {
+                      if (isEditing || !file.editable) return
+                      pendingEditAnchorRef.current = null
+                      flushSync(() => {
+                        setEditingFileId(file.id)
+                      })
+                    }}
                   >
                     {!editorVisualReady && (
                       <div className="readonly-skeleton milkdown-visual-skeleton">正在加载文档…</div>
@@ -359,16 +370,8 @@ export function EditorPane() {
                       onChange={(markdown) => updateEditorContent(file.id, markdown)}
                     />
                   </div>
-                  ) : (
-                    <div className="readonly-skeleton">正在加载完整编辑内容…</div>
-                  )
                 ) : (
-                  <ReadonlyChunkViewer
-                    file={file}
-                    entry={readonlyEntry}
-                    editable={file.editable}
-                    onEnterEdit={enterEditing}
-                  />
+                  <div className="readonly-skeleton">正在加载文档…</div>
                 )
               ) : (
                 <ReadonlyChunkViewer
