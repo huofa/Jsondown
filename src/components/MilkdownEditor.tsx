@@ -87,178 +87,6 @@ const logMarkdownPreview = (markdown: string) => {
   })
 }
 
-const CODE_BLOCK_LANGUAGES = ['text', 'json', 'yaml', 'html'] as const
-
-const normalizeCodeBlockLanguage = (value?: string | null) => {
-  const language = (value || '').trim().toLowerCase()
-
-  if (!language) return 'text'
-  if (language === 'txt') return 'text'
-  if (language === 'plain') return 'text'
-  if (language === 'plaintext') return 'text'
-  if (language === 'yml') return 'yaml'
-  if (language === 'js') return 'javascript'
-  if (language === 'ts') return 'typescript'
-  if (language === 'md') return 'markdown'
-
-  if (CODE_BLOCK_LANGUAGES.includes(language as typeof CODE_BLOCK_LANGUAGES[number])) {
-    return language
-  }
-
-  return language
-}
-
-const getCodeBlockLanguage = (block: HTMLElement) => {
-  const fromPre = block.getAttribute('data-language')
-  if (fromPre) return normalizeCodeBlockLanguage(fromPre)
-
-  const code = block.querySelector('code')
-  const fromCode = code?.getAttribute('data-language')
-  if (fromCode) return normalizeCodeBlockLanguage(fromCode)
-
-  const className = `${block.className || ''} ${code?.className || ''}`
-  const classMatch = className.match(/language-([a-z0-9_-]+)/i)
-  if (classMatch?.[1]) return normalizeCodeBlockLanguage(classMatch[1])
-
-  return 'text'
-}
-
-const getCodeBlockText = (block: HTMLElement) => {
-  const clone = block.cloneNode(true) as HTMLElement
-  clone.querySelectorAll([
-    '.jd-code-copy-button',
-    '.tools',
-    '.tools-button-group',
-    '.language-button',
-    '.language-picker',
-    '.cm-gutters',
-    '.cm-lineNumbers',
-  ].join(',')).forEach((node) => node.remove())
-  return clone.textContent || ''
-}
-
-const copyIconSvg = `
-  <svg class="jd-code-copy-icon" viewBox="0 0 24 24" aria-hidden="true">
-    <rect x="9" y="9" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2.25"/>
-    <path d="M5 15V7a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"/>
-  </svg>
-`
-
-const copiedIconSvg = `
-  <svg class="jd-code-copy-icon" viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>
-`
-
-const setCodeCopyButtonState = (button: HTMLButtonElement, copied: boolean) => {
-  button.dataset.copied = copied ? 'true' : 'false'
-  button.setAttribute('aria-label', copied ? '已复制代码块内容' : '复制代码块内容')
-  button.innerHTML = copied
-    ? `${copiedIconSvg}<span class="jd-code-copy-label">已复制</span>`
-    : copyIconSvg
-}
-
-const patchSingleCodeBlock = (block: HTMLElement) => {
-  const language = getCodeBlockLanguage(block)
-
-  block.setAttribute('data-language', language.toUpperCase())
-  block.setAttribute('data-jsondown-code-block', 'true')
-
-  const exists = block.querySelector(':scope > .jd-code-copy-button')
-  if (exists) return
-
-  const button = document.createElement('button')
-  button.type = 'button'
-  button.className = 'jd-code-copy-button'
-  button.setAttribute('contenteditable', 'false')
-  button.setAttribute('tabindex', '-1')
-  setCodeCopyButtonState(button, false)
-
-  block.appendChild(button)
-}
-
-const patchCodeBlocks = (root: HTMLElement) => {
-  const codeBlocks = root.querySelectorAll<HTMLElement>('.milkdown-code-block, .ProseMirror pre, pre')
-  codeBlocks.forEach(patchSingleCodeBlock)
-}
-
-const patchAddedCodeBlockNode = (node: Node) => {
-  if (!(node instanceof HTMLElement)) return
-
-  if (node instanceof HTMLPreElement || node.classList.contains('milkdown-code-block')) {
-    patchSingleCodeBlock(node)
-    return
-  }
-
-  node.querySelectorAll<HTMLElement>('.milkdown-code-block, pre').forEach(patchSingleCodeBlock)
-}
-
-const bindCodeBlockCopyAndPatch = (root: HTMLElement) => {
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      mutation.addedNodes.forEach(patchAddedCodeBlockNode)
-    })
-  })
-
-  observer.observe(root, { childList: true, subtree: true })
-
-  const handleMouseDown = (event: MouseEvent) => {
-    const target = event.target as HTMLElement | null
-    const button = target?.closest?.('.jd-code-copy-button') as HTMLButtonElement | null
-    if (!button) return
-
-    event.preventDefault()
-    event.stopPropagation()
-  }
-
-  const handlePointerOver = (event: PointerEvent) => {
-    const target = event.target as HTMLElement | null
-    const block = target?.closest?.('.milkdown-code-block, pre') as HTMLElement | null
-    if (!block) return
-
-    patchSingleCodeBlock(block)
-  }
-
-  const handleClick = async (event: MouseEvent) => {
-    const target = event.target as HTMLElement | null
-    const button = target?.closest?.('.jd-code-copy-button') as HTMLButtonElement | null
-    if (!button) return
-
-    event.preventDefault()
-    event.stopPropagation()
-
-    const block = button.closest('.milkdown-code-block, pre') as HTMLElement | null
-    if (!block) return
-
-    const text = getCodeBlockText(block)
-
-    try {
-      await navigator.clipboard.writeText(text)
-      setCodeCopyButtonState(button, true)
-      window.setTimeout(() => {
-        setCodeCopyButtonState(button, false)
-      }, 900)
-    } catch {
-      button.dataset.copied = 'true'
-      button.innerHTML = '<span class="jd-code-copy-label">失败</span>'
-      window.setTimeout(() => {
-        setCodeCopyButtonState(button, false)
-      }, 900)
-    }
-  }
-
-  root.addEventListener('pointerover', handlePointerOver)
-  root.addEventListener('mousedown', handleMouseDown, true)
-  root.addEventListener('click', handleClick, true)
-
-  return () => {
-    observer.disconnect()
-    root.removeEventListener('pointerover', handlePointerOver)
-    root.removeEventListener('mousedown', handleMouseDown, true)
-    root.removeEventListener('click', handleClick, true)
-  }
-}
-
 const getSpanHighlightStyle = (value?: string) => {
   if (!value || !/^<span\b/i.test(value)) return null
 
@@ -391,44 +219,180 @@ const jsondownHighlightSchema = $markSchema('jsondownHighlight', () => ({
 type MilkdownEditorProps = {
   value: string
   autoFocusStart?: boolean
+  initialSelectionCoords?: {
+    clientX: number
+    clientY: number
+    textBefore?: string
+    textAfter?: string
+    textOffset?: number
+  } | null
   readOnly?: boolean
   onChange: (markdown: string) => void
   onReady?: (api: EditorCommandApi | null) => void
   onVisualReady?: () => void
+  onInitialSelectionApplied?: () => void
+}
+
+const editableBlockSelector = [
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'p',
+  'li',
+  'blockquote',
+  'pre',
+  'td',
+  'th',
+].join(',')
+
+const findSplitOffset = (text: string, before?: string, after?: string) => {
+  if (before && after) {
+    let searchFrom = 0
+
+    while (searchFrom <= text.length) {
+      const beforeIndex = text.indexOf(before, searchFrom)
+      if (beforeIndex < 0) break
+
+      const split = beforeIndex + before.length
+      if (text.slice(split, split + after.length) === after) return split
+      searchFrom = beforeIndex + 1
+    }
+  }
+
+  if (after) {
+    const index = text.indexOf(after)
+    if (index >= 0) return index
+  }
+
+  if (before) {
+    const index = text.indexOf(before)
+    if (index >= 0) return index + before.length
+  }
+
+  return undefined
+}
+
+const findTextNodeAtOffset = (root: HTMLElement, offset: number) => {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let remaining = offset
+  let current = walker.nextNode()
+
+  while (current) {
+    const length = current.textContent?.length ?? 0
+
+    if (remaining <= length) {
+      return {
+        node: current,
+        offset: Math.max(0, Math.min(remaining, length)),
+      }
+    }
+
+    remaining -= length
+    current = walker.nextNode()
+  }
+
+  return null
+}
+
+const findSelectionPosFromTextAnchor = (
+  view: EditorView,
+  anchor?: MilkdownEditorProps['initialSelectionCoords'],
+) => {
+  if (!anchor?.textBefore && !anchor?.textAfter) return undefined
+
+  const blocks = Array.from(view.dom.querySelectorAll<HTMLElement>(editableBlockSelector))
+
+  for (const block of blocks) {
+    const text = block.textContent ?? ''
+    const splitOffset = findSplitOffset(text, anchor.textBefore, anchor.textAfter)
+
+    if (typeof splitOffset !== 'number') continue
+
+    const domPoint = findTextNodeAtOffset(block, splitOffset)
+    if (!domPoint) continue
+
+    try {
+      return view.posAtDOM(domPoint.node, domPoint.offset)
+    } catch {
+      // Keep searching. Some ProseMirror decoration nodes do not map cleanly.
+    }
+  }
+
+  return undefined
 }
 
 export function MilkdownEditor({
   value,
   autoFocusStart,
+  initialSelectionCoords,
   readOnly = false,
   onChange,
   onReady,
   onVisualReady,
+  onInitialSelectionApplied,
 }: MilkdownEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const onChangeRef = useRef(onChange)
   const onReadyRef = useRef(onReady)
   const onVisualReadyRef = useRef(onVisualReady)
+  const onInitialSelectionAppliedRef = useRef(onInitialSelectionApplied)
   const initialValueRef = useRef(value)
+  const initialSelectionCoordsRef = useRef(initialSelectionCoords)
   const readOnlyRef = useRef(readOnly)
   const editorViewRef = useRef<EditorView | null>(null)
 
   onChangeRef.current = onChange
   onReadyRef.current = onReady
   onVisualReadyRef.current = onVisualReady
+  onInitialSelectionAppliedRef.current = onInitialSelectionApplied
+  initialSelectionCoordsRef.current = initialSelectionCoords
   readOnlyRef.current = readOnly
 
   useEffect(() => {
     if (!rootRef.current) return
 
     let disposed = false
-    let disconnectCodeBlockCopy: (() => void) | null = null
 
+    const clearInitialSelectionCoords = () => {
+      initialSelectionCoordsRef.current = null
+      onInitialSelectionAppliedRef.current?.()
+    }
+
+    const focusAtInitialSelectionCoords = () =>
+      crepe.editor.action((ctx) => {
+        const coords = initialSelectionCoordsRef.current
+        const view = ctx.get(editorViewCtx)
+
+        if (!coords) return false
+
+        const anchoredPos = findSelectionPosFromTextAnchor(view, coords)
+        const resolved = view.posAtCoords({
+          left: coords.clientX,
+          top: coords.clientY,
+        })
+
+        view.focus()
+
+        const pos = typeof anchoredPos === 'number' ? anchoredPos : resolved?.pos
+
+        if (typeof pos === 'number') {
+          view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, pos)))
+          clearInitialSelectionCoords()
+          return true
+        }
+
+        clearInitialSelectionCoords()
+        return false
+      })
     const crepe = new Crepe({
       root: rootRef.current,
       defaultValue: initialValueRef.current,
       features: {
         [CrepeFeature.AI]: false,
+        [CrepeFeature.CodeMirror]: false,
         [CrepeFeature.Latex]: false,
         [CrepeFeature.TopBar]: false,
         [CrepeFeature.Toolbar]: false,
@@ -659,30 +623,12 @@ export function MilkdownEditor({
         return true
       })
 
-      const root = rootRef.current
-
       const markVisualReady = () => {
         if (disposed) return
-        const currentRoot = rootRef.current
-        if (currentRoot) patchCodeBlocks(currentRoot)
         onVisualReadyRef.current?.()
       }
 
-      if (root) {
-        disconnectCodeBlockCopy = bindCodeBlockCopyAndPatch(root)
-
-        window.requestAnimationFrame(() => {
-          if (disposed) return
-          patchCodeBlocks(root)
-          window.requestAnimationFrame(() => {
-            if (disposed) return
-            patchCodeBlocks(root)
-            window.setTimeout(markVisualReady, 80)
-          })
-        })
-      } else {
-        markVisualReady()
-      }
+      window.requestAnimationFrame(markVisualReady)
 
       onReadyRef.current?.({
         rememberSelection,
@@ -712,14 +658,17 @@ export function MilkdownEditor({
 
           return true
         })
+      } else if (!readOnlyRef.current && initialSelectionCoordsRef.current) {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => {
+            if (!disposed) focusAtInitialSelectionCoords()
+          })
+        })
       }
     })
 
     return () => {
       disposed = true
-
-      disconnectCodeBlockCopy?.()
-      disconnectCodeBlockCopy = null
 
       editorViewRef.current = null
       onReadyRef.current?.(null)
@@ -735,9 +684,31 @@ export function MilkdownEditor({
 
     view?.setProps({ editable: () => !readOnlyRef.current })
 
-    if (!readOnly) {
+    if (!readOnly && initialSelectionCoordsRef.current) {
       window.requestAnimationFrame(() => {
-        editorViewRef.current?.focus()
+        window.requestAnimationFrame(() => {
+          const view = editorViewRef.current
+          const coords = initialSelectionCoordsRef.current
+
+          if (!view || !coords) return
+
+          const resolved = view.posAtCoords({
+            left: coords.clientX,
+            top: coords.clientY,
+          })
+          const anchoredPos = findSelectionPosFromTextAnchor(view, coords)
+
+          view.focus()
+
+          const pos = typeof anchoredPos === 'number' ? anchoredPos : resolved?.pos
+
+          if (typeof pos === 'number') {
+            view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, pos)))
+          }
+
+          initialSelectionCoordsRef.current = null
+          onInitialSelectionAppliedRef.current?.()
+        })
       })
     }
   }, [readOnly])

@@ -703,79 +703,6 @@
   background: rgba(100,87,68,.08);
   font: .9em ui-monospace, SFMono-Regular, Menlo, monospace;
 }
-.markdown-code-block {
-  position: relative;
-  margin: .55em 0 .75em;
-  padding: 26px 14px 14px;
-  border: 1px solid rgba(17,24,39,.08);
-  border-radius: 10px;
-  background: #f8f8f7;
-}
-.markdown-code-block pre {
-  margin: 0;
-  overflow: auto;
-  color: #111827;
-  background: transparent;
-  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
-  white-space: pre;
-}
-.markdown-code-block code {
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
-  font: inherit;
-}
-.markdown-code-language {
-  position: absolute;
-  top: 8px;
-  left: 12px;
-  color: #111827;
-  font: 650 11px/1 ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
-}
-.markdown-code-copy-button {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 26px;
-  height: 24px;
-  padding: 0 7px;
-  border: 0;
-  border-radius: 7px;
-  color: #111827;
-  background: transparent;
-  opacity: 0;
-  pointer-events: none;
-  cursor: pointer;
-  transition: opacity .12s ease, background .12s ease;
-}
-.markdown-code-block:hover .markdown-code-copy-button,
-.markdown-code-copy-button:focus-visible,
-.markdown-code-copy-button[data-copied="true"] {
-  opacity: 1;
-  pointer-events: auto;
-}
-.markdown-code-copy-button:hover {
-  background: rgba(17,24,39,.06);
-}
-.markdown-code-copy-button svg {
-  width: 15px;
-  height: 15px;
-}
-.markdown-code-copy-button span {
-  font-size: 11px;
-  font-weight: 650;
-}
-.markdown-code-copy-button[data-copied="true"] {
-  min-width: 72px;
-  padding: 0 10px;
-  background: #f8f8f7;
-  box-shadow: 0 8px 22px rgba(17,24,39,.08);
-}
-
 /* Menus and dialogs */
 .context-menu { position: fixed; z-index: 100; width: 164px; padding: 5px; border: 1px solid rgba(75,64,51,.14); border-radius: 9px; background: rgba(255,255,255,.96); box-shadow: 0 14px 38px rgba(50,42,34,.18); backdrop-filter: blur(12px); }
 .context-menu button { width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 9px; border: 0; border-radius: 6px; background: transparent; font-size: 11px; cursor: pointer; }
@@ -985,10 +912,10 @@
   color: inherit;
 }
 
-/* 全编辑器选中色，也可以轻一点 */
+/* 全编辑器选中色：与代码块保持一致 */
 .editor-shell .ProseMirror ::selection,
 .milkdown .ProseMirror ::selection {
-  background: #d7ecff;
+  background: #bfe3ff;
   color: inherit;
 }
 
@@ -1194,4 +1121,65 @@
   padding: 0 10px !important;
   background: #f8f8f7 !important;
   box-shadow: 0 8px 22px rgba(17, 24, 39, .08) !important;
+}
+
+/* =========================================================
+   Jsondown static code block final
+   Code is plain document content with a quiet visual container.
+   No language chrome, no copy button, no hover DOM-dependent UI.
+   ========================================================= */
+.editor-shell pre,
+.markdown-rendered-viewer pre,
+.milkdown-host .ProseMirror pre,
+.milkdown-host .milkdown-code-block {
+  position: relative !important;
+  margin: 14px 0 !important;
+  padding: 16px 18px !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  border-radius: 14px !important;
+  background: #f7f7f7 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  color: #111 !important;
+  overflow: auto !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 13px !important;
+  line-height: 1.65 !important;
+  white-space: pre !important;
+}
+
+.editor-shell pre::before,
+.markdown-rendered-viewer pre::before,
+.milkdown-host .ProseMirror pre::before,
+.milkdown-host .milkdown-code-block::before {
+  display: none !important;
+  content: none !important;
+}
+
+.editor-shell pre code,
+.markdown-rendered-viewer pre code,
+.milkdown-host .ProseMirror pre code,
+.milkdown-host .milkdown-code-block code {
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  font: inherit !important;
+  white-space: pre !important;
+}
+
+.milkdown-host .milkdown-code-block .tools,
+.milkdown-host .milkdown-code-block .tools *,
+.milkdown-host .milkdown-code-block .tools-button-group,
+.milkdown-host .milkdown-code-block .tools-button-group *,
+.milkdown-host .milkdown-code-block .language-button,
+.milkdown-host .milkdown-code-block .language-picker,
+.editor-shell .jd-code-copy-button {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }

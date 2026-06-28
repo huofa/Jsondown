@@ -12,7 +12,7 @@ import { normalizeMarkdownForJsondown, type MarkdownNormalizeResult } from '../u
 import { startWindowDrag } from '../utils/windowDrag'
 import { ImagePreview } from './ImagePreview'
 import { MilkdownEditor } from './MilkdownEditor'
-import { ReadonlyChunkViewer } from './ReadonlyChunkViewer'
+import { ReadonlyChunkViewer, type ReadonlyEditAnchor } from './ReadonlyChunkViewer'
 import { SaveStatus } from './SaveStatus'
 import { ThemeSwitcher } from './ThemeSwitcher'
 import { ToastHost, showToast } from './Toast'
@@ -53,6 +53,7 @@ export function EditorPane() {
   const jsonMenuRef = useRef<HTMLDivElement>(null)
   const saveTimer = useRef<number | undefined>(undefined)
   const editorScrollRef = useRef<HTMLDivElement>(null)
+  const pendingEditAnchorRef = useRef<ReadonlyEditAnchor | null>(null)
   const previousActiveFileIdRef = useRef<string | null>(null)
   const lastUserScrollIntentAtRef = useRef(0)
 
@@ -146,8 +147,9 @@ export function EditorPane() {
     })
   }
 
-  const enterEditing = () => {
+  const enterEditing = (anchor?: ReadonlyEditAnchor) => {
     if (!file?.editable) return
+    pendingEditAnchorRef.current = anchor ?? null
     setEditorVisualReadyFileId(null)
     void loadFileContent(file.id, file.path, file.kind).then(() => {
       setEditingFileId(file.id)
@@ -348,8 +350,12 @@ export function EditorPane() {
                       value={content}
                       readOnly={!isEditing}
                       autoFocusStart={pendingEmptyFile?.id === file.id}
+                      initialSelectionCoords={pendingEditAnchorRef.current}
                       onReady={setEditorApi}
                       onVisualReady={() => setEditorVisualReadyFileId(file.id)}
+                      onInitialSelectionApplied={() => {
+                        pendingEditAnchorRef.current = null
+                      }}
                       onChange={(markdown) => updateEditorContent(file.id, markdown)}
                     />
                   </div>

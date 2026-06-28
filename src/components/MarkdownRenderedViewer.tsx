@@ -1,13 +1,8 @@
-import { useState, type MouseEvent, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 type MarkdownRenderedViewerProps = {
   markdown: string
   emptyText?: string
-}
-
-type CodeBlockProps = {
-  language: string
-  code: string
 }
 
 const sanitizeStyleColor = (value: string) => {
@@ -89,55 +84,6 @@ const parseInline = (text: string, keyPrefix: string): ReactNode[] => {
   return nodes
 }
 
-function CodeBlock({ language, code }: CodeBlockProps) {
-  const [copied, setCopied] = useState(false)
-  const label = (language || 'text').toUpperCase()
-
-  const copy = async (event: MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault()
-    event.stopPropagation()
-
-    try {
-      await navigator.clipboard.writeText(code)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 900)
-    } catch {
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 900)
-    }
-  }
-
-  return (
-    <div className="markdown-code-block" data-language={label}>
-      <div className="markdown-code-language">{label}</div>
-      <button
-        className="markdown-code-copy-button"
-        type="button"
-        onMouseDown={(event) => {
-          event.preventDefault()
-          event.stopPropagation()
-        }}
-        onClick={copy}
-        data-copied={copied ? 'true' : 'false'}
-        aria-label={copied ? '已复制代码块内容' : '复制代码块内容'}
-      >
-        {copied ? (
-          <>
-            <span aria-hidden="true">✓</span>
-            <span>已复制</span>
-          </>
-        ) : (
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="9" y="9" width="10" height="10" rx="2" fill="none" stroke="currentColor" strokeWidth="2.25" />
-            <path d="M5 15V7a2 2 0 0 1 2-2h8" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
-          </svg>
-        )}
-      </button>
-      <pre><code>{code}</code></pre>
-    </div>
-  )
-}
-
 const isListLine = (line: string) =>
   /^\s*(?:[-*+]\s+\[[ xX]\]\s+|[-*+]\s+|\d+[.)]\s+)/.test(line)
 
@@ -164,7 +110,6 @@ export function MarkdownRenderedViewer({ markdown, emptyText = '暂无内容' }:
 
     const fence = line.match(/^\s*```\s*([a-zA-Z0-9_-]+)?\s*$/)
     if (fence) {
-      const language = fence[1] || 'text'
       const codeLines: string[] = []
       cursor += 1
 
@@ -175,9 +120,9 @@ export function MarkdownRenderedViewer({ markdown, emptyText = '暂无内容' }:
 
       if (cursor < lines.length) cursor += 1
       blocks.push(
-        <div key={`block-${blockIndex}`} data-jd-readonly-block="true" data-jd-text={codeLines.join('\n').trim().slice(0, 80)}>
-          <CodeBlock language={language} code={codeLines.join('\n')} />
-        </div>,
+        <pre key={`block-${blockIndex}`} data-jd-readonly-block="true" data-jd-text={codeLines.join('\n').trim().slice(0, 80)}>
+          <code>{codeLines.join('\n')}</code>
+        </pre>,
       )
       blockIndex += 1
       continue

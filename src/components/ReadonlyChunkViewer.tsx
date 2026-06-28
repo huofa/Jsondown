@@ -7,6 +7,9 @@ export type ReadonlyEditAnchor = {
   clientY: number
   viewportOffset?: number
   textSnippet?: string
+  textBefore?: string
+  textAfter?: string
+  textOffset?: number
 }
 
 type ReadonlyChunkViewerProps = {
@@ -14,6 +17,61 @@ type ReadonlyChunkViewerProps = {
   entry?: OpenedFileCacheEntry
   editable?: boolean
   onEnterEdit?: (anchor?: ReadonlyEditAnchor) => void
+}
+
+const getCaretRangeFromPoint = (clientX: number, clientY: number) => {
+  const doc = document as Document & {
+    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null
+    caretRangeFromPoint?: (x: number, y: number) => Range | null
+  }
+
+  const caretPosition = doc.caretPositionFromPoint?.(clientX, clientY)
+  if (caretPosition) {
+    return {
+      node: caretPosition.offsetNode,
+      offset: caretPosition.offset,
+    }
+  }
+
+  const range = doc.caretRangeFromPoint?.(clientX, clientY)
+  if (!range) return null
+
+  return {
+    node: range.startContainer,
+    offset: range.startOffset,
+  }
+}
+
+const getTextOffsetWithin = (root: HTMLElement, targetNode: Node, targetOffset: number) => {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let offset = 0
+  let current = walker.nextNode()
+
+  while (current) {
+    if (current === targetNode) return offset + targetOffset
+    offset += current.textContent?.length ?? 0
+    current = walker.nextNode()
+  }
+
+  return undefined
+}
+
+const buildTextAnchor = (block: HTMLElement | null, clientX: number, clientY: number) => {
+  if (!block) return {}
+
+  const caret = getCaretRangeFromPoint(clientX, clientY)
+  const blockText = block.textContent ?? ''
+
+  if (!caret || !block.contains(caret.node)) return {}
+
+  const textOffset = getTextOffsetWithin(block, caret.node, caret.offset)
+  if (typeof textOffset !== 'number') return {}
+
+  return {
+    textOffset,
+    textBefore: blockText.slice(Math.max(0, textOffset - 48), textOffset),
+    textAfter: blockText.slice(textOffset, textOffset + 48),
+  }
 }
 
 export function ReadonlyChunkViewer({ file, entry, editable, onEnterEdit }: ReadonlyChunkViewerProps) {
@@ -35,12 +93,14 @@ export function ReadonlyChunkViewer({ file, entry, editable, onEnterEdit }: Read
         const viewportOffset = block && scroll
           ? block.getBoundingClientRect().top - scroll.getBoundingClientRect().top
           : undefined
+        const textAnchor = buildTextAnchor(block, event.clientX, event.clientY)
 
         onEnterEdit?.({
           clientX: event.clientX,
           clientY: event.clientY,
           viewportOffset,
           textSnippet: block?.dataset.jdText || block?.textContent?.trim().slice(0, 80),
+          ...textAnchor,
         })
       }}
     >
