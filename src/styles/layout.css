@@ -644,6 +644,15 @@ body.jsondown-editor-mode-editing .file-card.is-active {
 .markdown-rendered-viewer p {
   margin: 0 0 var(--custom-editor-paragraph-spacing);
 }
+.markdown-rendered-viewer strong,
+.markdown-rendered-viewer b {
+  color: #000;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -.025em;
+}
 .markdown-rendered-viewer h1,
 .markdown-rendered-viewer h2,
 .markdown-rendered-viewer h3,
