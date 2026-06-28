@@ -43,15 +43,16 @@
   -webkit-font-smoothing: antialiased;
 }
 
+.milkdown-host .ProseMirror::selection,
 .milkdown-host .ProseMirror ::selection {
-  background: rgba(248, 190, 0, 0.925);
-  color: #020202;
+  background: #bfe3ff !important;
+  color: inherit !important;
 }
 
 .milkdown-host .ProseMirror::-moz-selection,
 .milkdown-host .ProseMirror ::-moz-selection {
-  background: rgba(214, 174, 92, 0.34);
-  color: #120d06;
+  background: #bfe3ff !important;
+  color: inherit !important;
 }
 
 .milkdown-host .ProseMirror,
@@ -797,6 +798,60 @@ margin: .12em 0;
 .milkdown-host .ProseMirror pre .jd-code-copy-button[data-copied="true"] .jd-code-copy-label,
 .milkdown-host .milkdown-code-block > .jd-code-copy-button[data-copied="true"] .jd-code-copy-label {
   display: inline !important;
+}
+
+/* =========================================================
+   Jsondown static code block final override
+   Keep code blocks as normal selectable document content.
+   ========================================================= */
+.milkdown-host .ProseMirror pre,
+.milkdown-host .milkdown-code-block {
+  position: relative !important;
+  margin: 14px 0 !important;
+  padding: 16px 18px !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  border-radius: 14px !important;
+  background: #f7f7f7 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  color: #111 !important;
+  overflow: auto !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 13px !important;
+  line-height: 1.65 !important;
+  white-space: pre !important;
+}
+
+.milkdown-host .ProseMirror pre::before,
+.milkdown-host .milkdown-code-block::before {
+  display: none !important;
+  content: none !important;
+}
+
+.milkdown-host .ProseMirror pre code,
+.milkdown-host .milkdown-code-block code,
+.milkdown-host .milkdown-code-block .codemirror-host,
+.milkdown-host .milkdown-code-block .cm-editor,
+.milkdown-host .milkdown-code-block .cm-scroller,
+.milkdown-host .milkdown-code-block .cm-content,
+.milkdown-host .milkdown-code-block .cm-line {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  font: inherit !important;
+}
+
+.milkdown-host .milkdown-code-block .tools,
+.milkdown-host .milkdown-code-block .tools *,
+.milkdown-host .milkdown-code-block .tools-button-group,
+.milkdown-host .milkdown-code-block .tools-button-group *,
+.milkdown-host .milkdown-code-block .language-button,
+.milkdown-host .milkdown-code-block .language-picker,
+.milkdown-host .ProseMirror pre .jd-code-copy-button,
+.milkdown-host .milkdown-code-block > .jd-code-copy-button {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 .milkdown-host .milkdown-code-block .tools-button-group {
