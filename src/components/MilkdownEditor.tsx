@@ -369,6 +369,11 @@ export function MilkdownEditor({
       window.requestAnimationFrame(() => {
         if (disposed) return
         forceCaretRepaint()
+
+        window.requestAnimationFrame(() => {
+          if (disposed) return
+          forceCaretRepaint()
+        })
       })
 
       return false
@@ -450,7 +455,9 @@ export function MilkdownEditor({
           focus: () => scheduleCaretRepaint(),
           mousedown: () => scheduleCaretRepaint(),
           mouseup: () => scheduleCaretRepaint(),
+          pointerdown: () => scheduleCaretRepaint(),
           pointerup: () => scheduleCaretRepaint(),
+          click: () => scheduleCaretRepaint(),
           keyup: () => scheduleCaretRepaint(),
           compositionend: () => scheduleCaretRepaint(),
         },
