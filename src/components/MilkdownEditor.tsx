@@ -631,6 +631,19 @@ export function MilkdownEditor({
         return result
       })
 
+    const insertText = (text: string) =>
+      crepe.editor.action((ctx) => {
+        const view = restoreEditorSelection(ctx)
+        const { from, to } = view.state.selection
+
+        view.dispatch(view.state.tr.insertText(text, from, to))
+        rememberedSelection = view.state.selection
+        view.focus()
+        scheduleCaretRepaint()
+
+        return true
+      })
+
     const applyColor = (textColor: string, backgroundColor: string) =>
       crepe.editor.action((ctx) => {
         const view = restoreEditorSelection(ctx)
@@ -688,6 +701,7 @@ export function MilkdownEditor({
 
       onReadyRef.current?.({
         rememberSelection,
+        insertText,
         run,
         heading: (level) =>
           crepe.editor.action((ctx) => {

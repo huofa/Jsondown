@@ -110,6 +110,7 @@
   cursor: default;
 }
 .editor-actions .json-tools > button,
+.editor-actions .text-template-tools > button,
 .editor-actions .markdown-organize-button > button {
   height: 23px;
   padding: 0 6px;
@@ -118,8 +119,77 @@
 .density-menu { position: absolute; z-index: 50; top: 30px; right: 0; width: 184px; padding: 4px; border: 1px solid #ded8cf; border-radius: 10px; background: rgba(255,255,255,.97); box-shadow: 0 10px 28px rgba(55,47,39,.14); }
 .typography-menu { width: 180px; }
 .json-tools-menu { width: 118px; }
+.text-template-menu {
+  width: 248px;
+  padding: 7px;
+}
 .density-menu button { width: 100%; padding: 6px 8px; border: 0; border-radius: 5px; color: #686159; background: transparent; font-size: 10px; text-align: left; cursor: pointer; }
 .density-menu button:hover, .density-menu button.is-active { background: #eeeae4; }
+.text-template-list {
+  display: grid;
+  gap: 4px;
+  max-height: 210px;
+  overflow: auto;
+}
+.text-template-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 4px;
+  align-items: center;
+}
+.density-menu .text-template-insert {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.density-menu .text-template-mini {
+  width: auto;
+  padding: 5px 6px;
+  color: #9a9187;
+  font-size: 9px;
+  text-align: center;
+}
+.density-menu .text-template-add {
+  margin-top: 6px;
+  text-align: center;
+  background: rgba(181,146,97,.1);
+}
+.text-template-editor {
+  display: grid;
+  gap: 6px;
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(84,74,62,.1);
+}
+.text-template-editor input,
+.text-template-editor textarea {
+  width: 100%;
+  border: 1px solid rgba(80,70,58,.12);
+  border-radius: 7px;
+  color: #3b352e;
+  background: rgba(255,255,255,.72);
+  font-size: 10px;
+  outline: none;
+}
+.text-template-editor input {
+  height: 26px;
+  padding: 0 8px;
+}
+.text-template-editor textarea {
+  min-height: 104px;
+  padding: 7px 8px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  line-height: 1.55;
+}
+.text-template-editor-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+.density-menu .text-template-editor-actions button {
+  text-align: center;
+}
 .density-custom-panel {
   display: grid;
   gap: 8px;
