@@ -36,8 +36,7 @@
   caret-color: #f6b800 !important;
   font-family: ui-serif, "New York", "Iowan Old Style", "Songti SC", Georgia, serif;
   font-weight: 450;
-  // text-shadow: 0.12px 0 0 #000000 ;
-text-shadow: none !important;
+  text-shadow: none !important;
   font-size: var(--custom-editor-font-size) !important;
   line-height: var(--custom-editor-line-height) !important;
   letter-spacing: var(--custom-editor-letter-spacing) !important;
@@ -76,6 +75,15 @@ text-shadow: none !important;
   margin-top: 0 !important;
   margin-bottom: var(--custom-editor-paragraph-spacing) !important;
   white-space: pre-wrap;
+}
+.milkdown-host .ProseMirror strong,
+.milkdown-host .ProseMirror b {
+  color: #000000 !important;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  letter-spacing: -.025em !important;
 }
 .milkdown-host .ProseMirror h1,
 .milkdown-host .ProseMirror h2,
@@ -1029,6 +1037,8 @@ margin: .12em 0;
 
 .milkdown-host,
 .milkdown-host *,
+.milkdown-host.is-caret-repaint,
+.milkdown-host.is-caret-repaint *,
 .milkdown-host .ProseMirror,
 .milkdown-host .ProseMirror *,
 .milkdown-host [contenteditable="true"],
@@ -1039,18 +1049,22 @@ margin: .12em 0;
 /* ProseMirror second cursor layer */
 .milkdown-host .ProseMirror-gapcursor,
 .milkdown-host .ProseMirror-gapcursor:after,
-.milkdown-host .ProseMirror-dropcursor {
+.milkdown-host .ProseMirror-dropcursor,
+.milkdown-host.is-caret-repaint .ProseMirror-gapcursor,
+.milkdown-host.is-caret-repaint .ProseMirror-gapcursor:after,
+.milkdown-host.is-caret-repaint .ProseMirror-dropcursor {
   border-color: #f6b800 !important;
   border-left-color: #f6b800 !important;
   background: #f6b800 !important;
   box-shadow: none !important;
   color: #f6b800 !important;
-  display: none !important;
 }
 
 /* CodeMirror cursor fallback */
 .milkdown-host .cm-cursor,
-.milkdown-host .cm-cursorLayer .cm-cursor {
+.milkdown-host .cm-cursorLayer .cm-cursor,
+.milkdown-host.is-caret-repaint .cm-cursor,
+.milkdown-host.is-caret-repaint .cm-cursorLayer .cm-cursor {
   border-left-color: #f6b800 !important;
   border-left-width: 2px !important;
   box-shadow: none !important;

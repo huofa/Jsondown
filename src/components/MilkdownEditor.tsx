@@ -356,6 +356,42 @@ export function MilkdownEditor({
 
     let disposed = false
 
+    const forceCaretRepaint = () => {
+      const root = rootRef.current
+      if (!root) return
+
+      root.classList.remove('is-caret-repaint')
+      void root.offsetHeight
+      root.classList.add('is-caret-repaint')
+    }
+
+    const scheduleCaretRepaint = () => {
+      window.requestAnimationFrame(() => {
+        if (disposed) return
+        forceCaretRepaint()
+      })
+
+      return false
+    }
+
+    const scheduleCaretRepaintTwice = (after?: () => void) => {
+      window.requestAnimationFrame(() => {
+        if (disposed) return
+        forceCaretRepaint()
+
+        window.requestAnimationFrame(() => {
+          if (disposed) return
+          forceCaretRepaint()
+          after?.()
+        })
+      })
+    }
+
+    const dispatchSelection = (view: EditorView, selection: Selection) => {
+      view.dispatch(view.state.tr.setSelection(selection))
+      scheduleCaretRepaint()
+    }
+
     const clearInitialSelectionCoords = () => {
       initialSelectionCoordsRef.current = null
       onInitialSelectionAppliedRef.current?.()
@@ -379,7 +415,7 @@ export function MilkdownEditor({
         const pos = typeof anchoredPos === 'number' ? anchoredPos : resolved?.pos
 
         if (typeof pos === 'number') {
-          view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, pos)))
+          dispatchSelection(view, TextSelection.create(view.state.doc, pos))
           clearInitialSelectionCoords()
           return true
         }
@@ -409,36 +445,17 @@ export function MilkdownEditor({
         ...options,
         editable: () => !readOnlyRef.current,
         handleScrollToSelection: () => true,
-         handleDOMEvents: {
-
-    ...options.handleDOMEvents,
-
-    focus: () => scheduleCaretRepaint(),
-
-    mousedown: () => scheduleCaretRepaint(),
-
-    mouseup: () => scheduleCaretRepaint(),
-
-    pointerup: () => scheduleCaretRepaint(),
-
-    keyup: () => scheduleCaretRepaint(),
-
-    compositionend: () => scheduleCaretRepaint(),
-
-  },
+        handleDOMEvents: {
+          ...options.handleDOMEvents,
+          focus: () => scheduleCaretRepaint(),
+          mousedown: () => scheduleCaretRepaint(),
+          mouseup: () => scheduleCaretRepaint(),
+          pointerup: () => scheduleCaretRepaint(),
+          keyup: () => scheduleCaretRepaint(),
+          compositionend: () => scheduleCaretRepaint(),
+        },
       }))
-const scheduleCaretRepaint = () => {
-  window.requestAnimationFrame(() => {
-    const root = rootRef.current
-    if (!root) return
 
-    root.classList.remove('is-caret-repaint')
-    void root.offsetHeight
-    root.classList.add('is-caret-repaint')
-  })
-
-  return false
-}
       ctx.update(remarkStringifyOptionsCtx, (options) => ({
         ...options,
         handlers: {
@@ -507,10 +524,11 @@ const scheduleCaretRepaint = () => {
       const selection = rememberedSelection ?? view.state.selection
 
       view.focus()
+      scheduleCaretRepaint()
 
       try {
         if (!view.state.selection.eq(selection)) {
-          view.dispatch(view.state.tr.setSelection(selection))
+          dispatchSelection(view, selection)
         }
       } catch {
         rememberedSelection = null
@@ -602,6 +620,7 @@ const scheduleCaretRepaint = () => {
         }
 
         view.focus()
+        scheduleCaretRepaint()
         return result
       })
 
@@ -630,8 +649,10 @@ const scheduleCaretRepaint = () => {
           .scrollIntoView()
 
         view.dispatch(transaction)
+        scheduleCaretRepaint()
         rememberedSelection = view.state.selection
         view.focus()
+        scheduleCaretRepaint()
 
         return true
       })
@@ -656,7 +677,7 @@ const scheduleCaretRepaint = () => {
         onVisualReadyRef.current?.()
       }
 
-      window.requestAnimationFrame(markVisualReady)
+      scheduleCaretRepaintTwice(markVisualReady)
 
       onReadyRef.current?.({
         rememberSelection,
@@ -670,6 +691,7 @@ const scheduleCaretRepaint = () => {
               : ctx.get(commandsCtx).call(wrapInHeadingCommand.key, level)
 
             ctx.get(editorViewCtx).focus()
+            scheduleCaretRepaint()
 
             return result
           }),
@@ -682,7 +704,7 @@ const scheduleCaretRepaint = () => {
           const start = Math.min(1, view.state.doc.content.size)
 
           view.focus()
-          view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, start)))
+          dispatchSelection(view, TextSelection.create(view.state.doc, start))
 
           return true
         })
@@ -732,6 +754,14 @@ const scheduleCaretRepaint = () => {
 
           if (typeof pos === 'number') {
             view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, pos)))
+            window.requestAnimationFrame(() => {
+              const root = rootRef.current
+              if (!root) return
+
+              root.classList.remove('is-caret-repaint')
+              void root.offsetHeight
+              root.classList.add('is-caret-repaint')
+            })
           }
 
           initialSelectionCoordsRef.current = null
