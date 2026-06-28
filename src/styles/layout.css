@@ -465,6 +465,10 @@
 }
 .file-card:hover { background: #f0ede7; }
 .file-card.is-active { background: #e5d8c2; box-shadow: inset 0 0 0 1px rgba(142,106,57,.07); }
+body.jsondown-editor-mode-editing .file-card.is-active {
+  background: #f0ede7;
+  box-shadow: inset 0 0 0 1px rgba(142,106,57,.035);
+}
 .file-card-title { overflow: hidden; margin-bottom: 5px; color: #342f2a; font-size: 13px; font-weight: 670; text-overflow: ellipsis; white-space: nowrap; }
 .file-card-summary { display: -webkit-box; overflow: hidden; min-height: 28px; color: #817a71; font-size: 10.5px; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .file-card-footer { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: #aaa39a; font-size: 8.5px; }

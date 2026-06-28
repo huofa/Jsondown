@@ -33,10 +33,11 @@
   outline: none;
   color: #fc8c02;
 
-  caret-color: #fc8c02;
+  caret-color: #f6b800 !important;
   font-family: ui-serif, "New York", "Iowan Old Style", "Songti SC", Georgia, serif;
   font-weight: 450;
-  text-shadow: 0.12px 0 0 #020202;
+  // text-shadow: 0.12px 0 0 #000000 ;
+text-shadow: none !important;
   font-size: var(--custom-editor-font-size) !important;
   line-height: var(--custom-editor-line-height) !important;
   letter-spacing: var(--custom-editor-letter-spacing) !important;
@@ -118,7 +119,7 @@
   left: 0;
   top: 0;
   width: .82em;
-  color: #a7a19a;
+  color: #a7a19a ;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -131,7 +132,7 @@
   left: 0;
   top: 0;
   width: -.82em;
-  color: #a7a19a;
+  color: #a7a19a ;
   text-align: center;
 }
 .milkdown-host .ProseMirror li p {
@@ -308,6 +309,15 @@ margin: .12em 0;
 
 .milkdown-host .ProseMirror pre .cm-editor {
   outline: none !important;
+  caret-color: #f6b800 !important;
+}
+
+.milkdown-host .ProseMirror pre .cm-cursor,
+.milkdown-host .ProseMirror pre .cm-cursorLayer .cm-cursor,
+.milkdown-host .milkdown-code-block .cm-cursor,
+.milkdown-host .milkdown-code-block .cm-cursorLayer .cm-cursor {
+  border-left-color: #f6b800 !important;
+  border-left-width: 2px !important;
 }
 
 .milkdown-host .ProseMirror pre .cm-scroller {
@@ -1009,4 +1019,39 @@ margin: .12em 0;
 .milkdown-host .ProseMirror pre .jd-code-copy-button[data-copied="true"] .jd-code-copy-label,
 .milkdown-host .milkdown-code-block > .jd-code-copy-button[data-copied="true"] .jd-code-copy-label {
   display: inline !important;
+}
+
+
+/* =========================================================
+   Jsondown caret final override
+   Fix yellow / gray alternating caret
+   ========================================================= */
+
+.milkdown-host,
+.milkdown-host *,
+.milkdown-host .ProseMirror,
+.milkdown-host .ProseMirror *,
+.milkdown-host [contenteditable="true"],
+.milkdown-host [contenteditable="true"] * {
+  caret-color: #f6b800 !important;
+}
+
+/* ProseMirror second cursor layer */
+.milkdown-host .ProseMirror-gapcursor,
+.milkdown-host .ProseMirror-gapcursor:after,
+.milkdown-host .ProseMirror-dropcursor {
+  border-color: #f6b800 !important;
+  border-left-color: #f6b800 !important;
+  background: #f6b800 !important;
+  box-shadow: none !important;
+  color: #f6b800 !important;
+  display: none !important;
+}
+
+/* CodeMirror cursor fallback */
+.milkdown-host .cm-cursor,
+.milkdown-host .cm-cursorLayer .cm-cursor {
+  border-left-color: #f6b800 !important;
+  border-left-width: 2px !important;
+  box-shadow: none !important;
 }
