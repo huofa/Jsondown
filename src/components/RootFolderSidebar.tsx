@@ -62,6 +62,9 @@ export function RootFolderSidebar() {
     () => ordered.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id)),
     [ordered],
   )
+  const latestAllFiles = () => useRootFolderStore
+    .getState()
+    .folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id))
   const allFilesCount = allFiles.length
   const newFileLocked = Boolean(pendingEmptyFile && !(contents[pendingEmptyFile.id] ?? '').trim())
   const newFileLockedTitle = '请先输入内容，或切换后自动清理当前空文件'
@@ -284,7 +287,7 @@ export function RootFolderSidebar() {
             }
             if (!importTarget) return
             const id = importMockFile(importTarget.id)
-            if (id) void requestOpenFile(id, allFiles)
+            if (id) void requestOpenFile(id, latestAllFiles())
             showToast('已模拟导入文件')
           })()
         }}
@@ -309,7 +312,7 @@ export function RootFolderSidebar() {
           onNewFile={() => {
             void createMockFile(menu.folder.id).then((id) => {
               if (id) {
-                void requestOpenFile(id, allFiles)
+                void requestOpenFile(id, latestAllFiles())
                 showToast(`已在“${menu.folder.name}”下新建文件`)
               }
             })

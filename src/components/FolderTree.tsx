@@ -59,6 +59,9 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
     () => folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id)),
     [folders],
   )
+  const latestAllFiles = () => useRootFolderStore
+    .getState()
+    .folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id))
 
   const openFolderMenu = (event: MouseEvent, node: FileTreeNode) => {
     event.preventDefault()
@@ -158,7 +161,7 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
           onNewFile={menu.node.kind === 'directory' ? () => {
             void createMockFile(menu.node.id).then((id) => {
               if (id) {
-                void requestOpenFile(id, allFiles)
+                void requestOpenFile(id, latestAllFiles())
                 showToast(`已在“${menu.node.name}”下新建文件`)
               }
             })

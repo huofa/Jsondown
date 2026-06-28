@@ -20,7 +20,52 @@ import { ToastHost, showToast } from './Toast'
 import { TopEditorToolbar } from './TopEditorToolbar'
 import { LayoutDensitySwitcher } from './LayoutDensitySwitcher'
 import { MarkdownOrganizeDialog } from './MarkdownOrganizeDialog'
+import { PlainTextCodeEditor, type PlainTextCodeEditorHandle } from './PlainTextCodeEditor'
 import { SidebarCollapseButton } from './SidebarCollapseButton'
+import { CODE_TEXT_EXTENSIONS, MARKDOWN_EXTENSIONS } from '../utils/fileFilters'
+
+type TextTemplate = {
+  id: string
+  name: string
+  content: string
+}
+
+const textTemplateStorageKey = 'jsondown:text-templates'
+
+const defaultTextTemplates: TextTemplate[] = [
+  {
+    id: 'json-basic',
+    name: 'JSON 基础模板',
+    content: '{\n  "title": "",\n  "description": "",\n  "tags": [],\n  "status": "active"\n}',
+  },
+  {
+    id: 'yaml-basic',
+    name: 'YAML 基础模板',
+    content: 'title:\ndescription:\ntags:\n  -\nstatus: active',
+  },
+  {
+    id: 'html-basic',
+    name: 'HTML 基础模板',
+    content: '<div>\n  内容\n</div>',
+  },
+  {
+    id: 'text-basic',
+    name: 'TEXT 基础模板',
+    content: '标题：\n说明：\n备注：\n注意：',
+  },
+]
+
+const loadTextTemplates = () => {
+  if (typeof window === 'undefined') return defaultTextTemplates
+  try {
+    const raw = window.localStorage.getItem(textTemplateStorageKey)
+    if (!raw) return defaultTextTemplates
+    const parsed = JSON.parse(raw) as TextTemplate[]
+    return Array.isArray(parsed) && parsed.length ? parsed : defaultTextTemplates
+  } catch {
+    return defaultTextTemplates
+  }
+}
 
 export function EditorPane() {
   const folders = useRootFolderStore((state) => state.folders)
@@ -47,11 +92,17 @@ export function EditorPane() {
   const theme = useThemeStore((state) => state.theme)
   const [editorApi, setEditorApi] = useState<EditorCommandApi | null>(null)
   const [editingFileId, setEditingFileId] = useState<string | null>(null)
-  const [jsonMenuOpen, setJsonMenuOpen] = useState(false)
+  const [textTemplateOpen, setTextTemplateOpen] = useState(false)
+  const [textTemplates, setTextTemplates] = useState<TextTemplate[]>(loadTextTemplates)
+  const [templateEditorOpen, setTemplateEditorOpen] = useState(false)
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null)
+  const [templateName, setTemplateName] = useState('')
+  const [templateContent, setTemplateContent] = useState('')
   const [organizeResult, setOrganizeResult] = useState<MarkdownNormalizeResult | null>(null)
   const [organizing, setOrganizing] = useState(false)
   const [editorVisualReadyFileId, setEditorVisualReadyFileId] = useState<string | null>(null)
-  const jsonMenuRef = useRef<HTMLDivElement>(null)
+  const textTemplateMenuRef = useRef<HTMLDivElement>(null)
+  const plainTextEditorRef = useRef<PlainTextCodeEditorHandle>(null)
   const saveTimer = useRef<number | undefined>(undefined)
   const editorScrollRef = useRef<HTMLDivElement>(null)
   const pendingEditAnchorRef = useRef<ReadonlyEditAnchor | null>(null)
@@ -69,8 +120,8 @@ export function EditorPane() {
   const readonlyEntry = file ? readonlyEntries[getReadonlyKey(file)] : undefined
   const isEditing = Boolean(file?.editable && editingFileId === file.id)
   const editorVisualReady = Boolean(file?.editable && editorVisualReadyFileId === file.id)
-  const isMarkdownFile = Boolean(file && ['md', 'markdown'].includes(file.extension.toLowerCase()))
-  const isJsonFile = Boolean(file && file.extension.toLowerCase() === 'json')
+  const isMarkdownFile = Boolean(file && MARKDOWN_EXTENSIONS.has(file.extension.toLowerCase()))
+  const isTextCodeFile = Boolean(file && CODE_TEXT_EXTENSIONS.has(file.extension.toLowerCase()))
 
   useEffect(() => {
     if (!file) return
@@ -83,12 +134,12 @@ export function EditorPane() {
       void loadFileContent(file.id, file.path, file.kind)
       return
     }
-    if (file.editable && isMarkdownFile) {
+    if (file.editable && (isMarkdownFile || isTextCodeFile)) {
       void loadFileContent(file.id, file.path, file.kind)
       return
     }
     void openReadonlyFile(file)
-  }, [file, isMarkdownFile, loadFileContent, openReadonlyFile, pendingEmptyFile?.id])
+  }, [file, isMarkdownFile, isTextCodeFile, loadFileContent, openReadonlyFile, pendingEmptyFile?.id])
 
   useEffect(() => {
     if (!file || file.editable || isEditing || !readonlyEntry) return
@@ -154,23 +205,31 @@ export function EditorPane() {
   }, [])
 
   useEffect(() => {
-    if (!jsonMenuOpen) return
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(textTemplateStorageKey, JSON.stringify(textTemplates))
+  }, [textTemplates])
+
+  useEffect(() => {
+    if (!textTemplateOpen) return
     const close = (event: MouseEvent) => {
-      if (!jsonMenuRef.current?.contains(event.target as Node)) setJsonMenuOpen(false)
+      if (!textTemplateMenuRef.current?.contains(event.target as Node)) setTextTemplateOpen(false)
     }
-    const closeOnBlur = () => setJsonMenuOpen(false)
+    const closeOnBlur = () => setTextTemplateOpen(false)
     window.addEventListener('mousedown', close)
     window.addEventListener('blur', closeOnBlur)
     return () => {
       window.removeEventListener('mousedown', close)
       window.removeEventListener('blur', closeOnBlur)
     }
-  }, [jsonMenuOpen])
+  }, [textTemplateOpen])
 
   const createDocument = () => {
     void createMockDocument(activeFolderId).then((id) => {
       if (id) {
-        void requestOpenFile(id, allFiles)
+        const latestFiles = useRootFolderStore
+          .getState()
+          .folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id))
+        void requestOpenFile(id, latestFiles)
         showToast('已新建 Markdown 笔记')
       }
     })
@@ -210,18 +269,83 @@ export function EditorPane() {
     window.requestAnimationFrame(restoreScroll)
   }
 
-  const handleJsonButton = () => {
-    if (!file) return
-    if (!isJsonFile) {
-      showToast('仅 JSON 文件可用')
+  const rememberTemplateSelection = () => {
+    if (isTextCodeFile) {
+      plainTextEditorRef.current?.rememberSelection()
       return
     }
-    setJsonMenuOpen((open) => !open)
+    editorApi?.rememberSelection()
   }
 
-  const handleJsonPlaceholder = (label: string) => {
-    setJsonMenuOpen(false)
-    showToast(`${label} 后续开发中`)
+  const handleTextTemplateButton = () => {
+    if (!file?.editable || !isEditing) {
+      showToast('请先点击正文进入编辑')
+      return
+    }
+    rememberTemplateSelection()
+    setTextTemplateOpen((open) => !open)
+  }
+
+  const insertTextTemplate = (template: TextTemplate) => {
+    if (!file?.editable || !isEditing) {
+      showToast('请先点击正文进入编辑')
+      return
+    }
+
+    const inserted = isTextCodeFile
+      ? plainTextEditorRef.current?.insertText(template.content)
+      : editorApi?.insertText(template.content)
+
+    if (!inserted) {
+      showToast('请先定位光标')
+      return
+    }
+
+    setTextTemplateOpen(false)
+  }
+
+  const startAddTemplate = () => {
+    setEditingTemplateId(null)
+    setTemplateName('')
+    setTemplateContent('')
+    setTemplateEditorOpen(true)
+  }
+
+  const startEditTemplate = (template: TextTemplate) => {
+    setEditingTemplateId(template.id)
+    setTemplateName(template.name)
+    setTemplateContent(template.content)
+    setTemplateEditorOpen(true)
+  }
+
+  const saveTextTemplate = () => {
+    const name = templateName.trim()
+    const nextContent = templateContent
+
+    if (!name || !nextContent.trim()) {
+      showToast('模板名称和内容不能为空')
+      return
+    }
+
+    if (editingTemplateId) {
+      setTextTemplates((templates) => templates.map((template) => (
+        template.id === editingTemplateId ? { ...template, name, content: nextContent } : template
+      )))
+    } else {
+      setTextTemplates((templates) => [
+        ...templates,
+        { id: `template-${Date.now()}`, name, content: nextContent },
+      ])
+    }
+
+    setTemplateEditorOpen(false)
+    setEditingTemplateId(null)
+    setTemplateName('')
+    setTemplateContent('')
+  }
+
+  const deleteTextTemplate = (id: string) => {
+    setTextTemplates((templates) => templates.filter((template) => template.id !== id))
   }
 
   const handleOrganizeMarkdown = async () => {
@@ -298,18 +422,56 @@ export function EditorPane() {
         >
           <SquarePen size={15} />
         </button>
-        <TopEditorToolbar api={editorApi} disabled={!file?.editable || !isEditing} />
+        <TopEditorToolbar api={editorApi} disabled={!file?.editable || !isEditing || isTextCodeFile} />
         <div className="editor-actions">
-          <div className="density-switcher json-tools" ref={jsonMenuRef}>
-            <button title="JSON 工具" aria-label="JSON 工具" disabled={!file} onClick={handleJsonButton}>
-              <span>JSON</span>
+          <div className="density-switcher text-template-tools" ref={textTemplateMenuRef}>
+            <button
+              title="插入常用文本模板"
+              aria-label="文本模板"
+              disabled={!file?.editable || !isEditing}
+              onMouseDown={() => rememberTemplateSelection()}
+              onClick={handleTextTemplateButton}
+            >
+              <span>文本模板</span>
             </button>
-            {jsonMenuOpen && (
-              <div className="density-menu json-tools-menu">
-                <button onClick={() => handleJsonPlaceholder('JSON 格式化')}>JSON 格式化</button>
-                <button onClick={() => handleJsonPlaceholder('JSON 校验')}>JSON 校验</button>
-                <button onClick={() => handleJsonPlaceholder('JSON 压缩')}>JSON 压缩</button>
-                <button disabled>后续开发中</button>
+            {textTemplateOpen && (
+              <div className="density-menu text-template-menu">
+                <div className="text-template-list">
+                  {textTemplates.map((template) => (
+                    <div className="text-template-row" key={template.id}>
+                      <button
+                        className="text-template-insert"
+                        title={template.content}
+                        onMouseDown={() => rememberTemplateSelection()}
+                        onClick={() => insertTextTemplate(template)}
+                      >
+                        {template.name}
+                      </button>
+                      <button className="text-template-mini" onClick={() => startEditTemplate(template)}>编辑</button>
+                      <button className="text-template-mini" onClick={() => deleteTextTemplate(template.id)}>删除</button>
+                    </div>
+                  ))}
+                </div>
+                {templateEditorOpen ? (
+                  <div className="text-template-editor">
+                    <input
+                      value={templateName}
+                      placeholder="模板名称"
+                      onChange={(event) => setTemplateName(event.currentTarget.value)}
+                    />
+                    <textarea
+                      value={templateContent}
+                      placeholder="模板内容"
+                      onChange={(event) => setTemplateContent(event.currentTarget.value)}
+                    />
+                    <div className="text-template-editor-actions">
+                      <button onClick={saveTextTemplate}>保存</button>
+                      <button onClick={() => setTemplateEditorOpen(false)}>取消</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button className="text-template-add" onClick={startAddTemplate}>添加模板</button>
+                )}
               </div>
             )}
           </div>
@@ -345,12 +507,12 @@ export function EditorPane() {
         <div className="editor-empty">
           <div className="empty-mark"><FileQuestion size={27} /></div>
           <h2>选一篇笔记，开始写作</h2>
-          <p>Markdown 文件可以直接编辑，代码、文本与图片会以只读方式打开。</p>
+          <p>Markdown、JSON、HTML、YAML 与文本文件可以直接编辑，图片会以预览方式打开。</p>
         </div>
       ) : (
         <div
           ref={editorScrollRef}
-          className="editor-scroll"
+          className={`editor-scroll ${isTextCodeFile ? 'is-code-paper' : ''}`}
           onScroll={handleEditorScroll}
           onWheelCapture={markUserScrollIntent}
           onTouchMoveCapture={markUserScrollIntent}
@@ -360,7 +522,7 @@ export function EditorPane() {
           {file.kind === 'image' ? (
             <ImagePreview src={content} name={file.name} />
           ) : (
-            <article className="paper">
+            <article className={`paper ${isTextCodeFile ? 'code-paper' : ''}`}>
               {file.editable && isMarkdownFile ? (
                 fullContentLoaded ? (
                   <div
@@ -392,6 +554,28 @@ export function EditorPane() {
                         pendingEditAnchorRef.current = null
                       }}
                       onChange={(markdown) => updateEditorContent(file.id, markdown)}
+                    />
+                  </div>
+                ) : (
+                  <div className="readonly-skeleton">正在加载文档…</div>
+                )
+              ) : file.editable && isTextCodeFile ? (
+                fullContentLoaded ? (
+                  <div
+                    className={`plain-text-code-shell ${isEditing ? 'is-editing' : 'is-readonly'}`}
+                    onMouseDownCapture={() => {
+                      if (isEditing || !file.editable) return
+                      flushSync(() => {
+                        setEditingFileId(file.id)
+                      })
+                    }}
+                  >
+                    <PlainTextCodeEditor
+                      ref={plainTextEditorRef}
+                      value={content}
+                      readOnly={!isEditing}
+                      autoFocusStart={pendingEmptyFile?.id === file.id}
+                      onChange={(value) => updateEditorContent(file.id, value)}
                     />
                   </div>
                 ) : (

@@ -18,6 +18,7 @@ export type EditorCommand =
 
 export type EditorCommandApi = {
   rememberSelection: () => boolean
+  insertText: (text: string) => boolean
   run: (command: EditorCommand, payload?: string) => boolean
   heading: (level: number) => boolean
   applyColor: (textColor: string, backgroundColor: string) => boolean

@@ -1,6 +1,19 @@
 import type { EditableFileKind } from '../types/file'
 
-export const EDITABLE_EXTENSIONS = new Set(['md', 'markdown'])
+export const EDITABLE_EXTENSIONS = new Set([
+  'md',
+  'markdown',
+  'json',
+  'html',
+  'htm',
+  'yaml',
+  'yml',
+  'txt',
+  'text',
+])
+
+export const MARKDOWN_EXTENSIONS = new Set(['md', 'markdown'])
+export const CODE_TEXT_EXTENSIONS = new Set(['json', 'html', 'htm', 'yaml', 'yml', 'txt', 'text'])
 
 export const VIEWABLE_EXTENSIONS = new Set([
   ...EDITABLE_EXTENSIONS,
@@ -42,7 +55,7 @@ export function isEditableFile(name: string) {
 }
 
 export function getFileKind(extension: string): EditableFileKind {
-  if (EDITABLE_EXTENSIONS.has(extension)) return 'markdown'
+  if (MARKDOWN_EXTENSIONS.has(extension)) return 'markdown'
   if (IMAGE_EXTENSIONS.has(extension)) return 'image'
   if (extension === 'json') return 'json'
   if (extension === 'html' || extension === 'htm') return 'html'

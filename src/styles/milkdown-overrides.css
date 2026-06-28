@@ -1041,6 +1041,8 @@ margin: .12em 0;
 .milkdown-host.is-caret-repaint *,
 .milkdown-host .ProseMirror,
 .milkdown-host .ProseMirror *,
+.milkdown-host .ProseMirror-focused,
+.milkdown-host .ProseMirror-focused *,
 .milkdown-host [contenteditable="true"],
 .milkdown-host [contenteditable="true"] * {
   caret-color: #f6b800 !important;
@@ -1050,6 +1052,9 @@ margin: .12em 0;
 .milkdown-host .ProseMirror-gapcursor,
 .milkdown-host .ProseMirror-gapcursor:after,
 .milkdown-host .ProseMirror-dropcursor,
+.milkdown-host .ProseMirror-focused .ProseMirror-gapcursor,
+.milkdown-host .ProseMirror-focused .ProseMirror-gapcursor:after,
+.milkdown-host .ProseMirror-focused .ProseMirror-dropcursor,
 .milkdown-host.is-caret-repaint .ProseMirror-gapcursor,
 .milkdown-host.is-caret-repaint .ProseMirror-gapcursor:after,
 .milkdown-host.is-caret-repaint .ProseMirror-dropcursor {
