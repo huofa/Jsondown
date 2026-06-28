@@ -409,8 +409,36 @@ export function MilkdownEditor({
         ...options,
         editable: () => !readOnlyRef.current,
         handleScrollToSelection: () => true,
-      }))
+         handleDOMEvents: {
 
+    ...options.handleDOMEvents,
+
+    focus: () => scheduleCaretRepaint(),
+
+    mousedown: () => scheduleCaretRepaint(),
+
+    mouseup: () => scheduleCaretRepaint(),
+
+    pointerup: () => scheduleCaretRepaint(),
+
+    keyup: () => scheduleCaretRepaint(),
+
+    compositionend: () => scheduleCaretRepaint(),
+
+  },
+      }))
+const scheduleCaretRepaint = () => {
+  window.requestAnimationFrame(() => {
+    const root = rootRef.current
+    if (!root) return
+
+    root.classList.remove('is-caret-repaint')
+    void root.offsetHeight
+    root.classList.add('is-caret-repaint')
+  })
+
+  return false
+}
       ctx.update(remarkStringifyOptionsCtx, (options) => ({
         ...options,
         handlers: {

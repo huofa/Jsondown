@@ -218,6 +218,10 @@ export function FlatFileListPane() {
                     selected={activeFileId === file.id}
                     showParentFolder={isAllFiles}
                     onOpen={() => {
+                      if (activeFileId === file.id && document.body.classList.contains('jsondown-editor-mode-editing')) {
+                        window.dispatchEvent(new CustomEvent('jsondown:exit-editing'))
+                        return
+                      }
                       const openTarget = () => {
                         if (!isAllFiles && file.rootFolderId) selectFolder(activeFolderId ?? file.rootFolderId)
                         void requestOpenFile(file.id, allFiles)

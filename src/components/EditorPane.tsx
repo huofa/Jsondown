@@ -100,6 +100,30 @@ export function EditorPane() {
   }, [file?.id, isEditing, readonlyEntry?.path, readonlyEntry?.readonlyLoadedBytes])
 
   useEffect(() => {
+    document.body.classList.toggle('jsondown-editor-mode-editing', isEditing)
+    return () => {
+      document.body.classList.remove('jsondown-editor-mode-editing')
+    }
+  }, [isEditing])
+
+  useEffect(() => {
+    const exitEditing = () => {
+      if (!file?.editable || !isEditing) return
+      if (saveStatus === 'dirty') {
+        void saveFileContent(file.id, file.path).finally(() => {
+          setEditingFileId(null)
+          setEditorApi(null)
+        })
+        return
+      }
+      setEditingFileId(null)
+      setEditorApi(null)
+    }
+    window.addEventListener('jsondown:exit-editing', exitEditing)
+    return () => window.removeEventListener('jsondown:exit-editing', exitEditing)
+  }, [file?.editable, file?.id, file?.path, isEditing, saveFileContent, saveStatus])
+
+  useEffect(() => {
     const previousActiveFileId = previousActiveFileIdRef.current
     previousActiveFileIdRef.current = activeFileId
 
@@ -202,9 +226,6 @@ export function EditorPane() {
 
   const handleOrganizeMarkdown = async () => {
     if (!file || !isMarkdownFile) return
-    if (!fullContentLoaded) {
-      await loadFileContent(file.id, file.path, file.kind)
-    }
     if (saveStatus === 'dirty') {
       const ok = await saveFileContent(file.id, file.path)
       if (!ok) {
@@ -213,10 +234,13 @@ export function EditorPane() {
       }
     }
 
+    await reloadFileContent(file.id, file.path, file.kind)
     const latestContent = useEditorStore.getState().contents[file.id] ?? contents[file.id] ?? ''
     const result = normalizeMarkdownForJsondown(latestContent)
     if (!result.changed) {
-      showToast('当前文档已符合 Jsondown 格式')
+      setEditingFileId(null)
+      setEditorApi(null)
+      showToast('当前文档已符合 Jsondown 格式，已重新加载')
       return
     }
     setOrganizeResult(result)
