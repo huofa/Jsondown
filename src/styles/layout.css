@@ -718,18 +718,18 @@ body.jsondown-editor-mode-editing .file-card.is-active {
 .markdown-rendered-viewer h4,
 .markdown-rendered-viewer h5,
 .markdown-rendered-viewer h6 {
-  margin: 0 0 .08em;
+  margin: 0 0 var(--custom-editor-paragraph-spacing);
   color: #000;
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
   font-weight: 760;
   letter-spacing: -.025em;
 }
-.markdown-rendered-viewer h1 { font-size: 24px; line-height: 1.08; }
-.markdown-rendered-viewer h2 { font-size: 20px; line-height: 1.1; }
-.markdown-rendered-viewer h3 { font-size: 16px; line-height: 1.12; }
+.markdown-rendered-viewer h1 { font-size: 24px; line-height: var(--custom-editor-line-height); }
+.markdown-rendered-viewer h2 { font-size: 20px; line-height: var(--custom-editor-line-height); }
+.markdown-rendered-viewer h3 { font-size: 16px; line-height: var(--custom-editor-line-height); }
 .markdown-rendered-viewer h4,
 .markdown-rendered-viewer h5,
-.markdown-rendered-viewer h6 { font-size: 13px; line-height: 1.18; }
+.markdown-rendered-viewer h6 { font-size: 13px; line-height: var(--custom-editor-line-height); }
 .markdown-rendered-viewer ul,
 .markdown-rendered-viewer ol {
   margin: .08em 0 .18em;

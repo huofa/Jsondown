@@ -49,7 +49,7 @@ export function LayoutDensitySwitcher() {
               行高 <span>{customEditorLayout.lineHeight.toFixed(2)}</span>
               <input
                 type="range"
-                min="0.85"
+                min="0.7"
                 max="2.35"
                 step="0.05"
                 value={customEditorLayout.lineHeight}
