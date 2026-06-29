@@ -741,7 +741,7 @@ body.jsondown-editor-mode-editing .file-card.is-active {
 }
 .markdown-rendered-viewer ol > li {
   margin-top: 0;
-  margin-bottom: .08em;
+  margin-bottom: 0.3em;
 }
 .markdown-rendered-viewer .contains-task-list {
   padding-left: 0;
