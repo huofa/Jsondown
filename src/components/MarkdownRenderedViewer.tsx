@@ -24,6 +24,9 @@ const extractSafeSpanStyle = (rawStyle: string) => {
   }
 }
 
+const isSafeLinkHref = (href: string) =>
+  /^(https?:\/\/|mailto:)/i.test(href.trim())
+
 const parseInline = (text: string, keyPrefix: string): ReactNode[] => {
   const nodes: ReactNode[] = []
   let rest = text
@@ -56,7 +59,7 @@ const parseInline = (text: string, keyPrefix: string): ReactNode[] => {
       continue
     }
 
-    const tokenMatch = rest.match(/(`[^`]+`|\*\*[^*]+\*\*|~~[^~]+~~|\*[^*]+\*)/)
+    const tokenMatch = rest.match(/(\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|~~[^~]+~~|\*[^*]+\*)/)
     if (!tokenMatch || tokenMatch.index === undefined) {
       pushText(rest)
       break
@@ -65,6 +68,29 @@ const parseInline = (text: string, keyPrefix: string): ReactNode[] => {
     pushText(rest.slice(0, tokenMatch.index))
 
     const token = tokenMatch[0]
+    const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/)
+    if (linkMatch) {
+      const label = linkMatch[1]
+      const href = linkMatch[2].trim()
+      if (isSafeLinkHref(href)) {
+        nodes.push(
+          <a
+            key={`${keyPrefix}-link-${index}`}
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {parseInline(label, `${keyPrefix}-link-${index}`)}
+          </a>,
+        )
+      } else {
+        pushText(token)
+      }
+      rest = rest.slice(tokenMatch.index + token.length)
+      index += 1
+      continue
+    }
+
     const inner = token.replace(/^(`|\*\*|~~|\*)/, '').replace(/(`|\*\*|~~|\*)$/, '')
 
     if (token.startsWith('`')) {

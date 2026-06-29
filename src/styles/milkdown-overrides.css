@@ -226,12 +226,12 @@
   margin-top: 0 !important;
 }
 .milkdown-host .ProseMirror blockquote {
-margin: .12em 0;
-  padding: 0.1em 0 0.1em .1em;
+  margin: .7em 0 0.1em !important;
+  padding: 0.05em 0 0.01em 0.1em;
   border-left: 5px solid rgba(68, 190, 156, 0.68) !important;
   background: transparent !important;
   color: #05e9b3 !important;
-  line-height: 0.8em;
+  line-height: inherit;
 }
 .milkdown-host .ProseMirror blockquote,
 .milkdown-host .ProseMirror blockquote * {
@@ -260,7 +260,7 @@ margin: .12em 0;
   -webkit-box-decoration-break: clone; }
 
 
-.milkdown-host .ProseMirror blockquote p + p { margin-top: .32em !important; }
+.milkdown-host .ProseMirror blockquote p + p { margin-top: .18em !important; }
 .milkdown-host .ProseMirror a { color: #9c6724; text-decoration-color: rgba(156,103,36,.35); text-underline-offset: 3px; }
 .milkdown-host .ProseMirror em {
   font-style: oblique 14deg !important;
