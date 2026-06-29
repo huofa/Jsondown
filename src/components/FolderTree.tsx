@@ -44,11 +44,13 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
     activeFolderId,
     createMockFile,
     createMockSubfolder,
+    duplicateFile,
     removeTreeNode,
     renameFile,
     renameTreeFolder,
     refreshRootFolder,
     selectFolder,
+    togglePinnedFile,
   } = useRootFolderStore()
   const loadRecentlyDeleted = useRecentlyDeletedStore((state) => state.loadRecentlyDeleted)
   const moveToRecentlyDeleted = useRecentlyDeletedStore((state) => state.moveToRecentlyDeleted)
@@ -58,6 +60,14 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
   const allFiles = useMemo(
     () => folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id)),
     [folders],
+  )
+  const orderedNodes = useMemo(
+    () => [...nodes].sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1
+      if (a.kind === 'file' && b.kind === 'file' && a.pinned !== b.pinned) return a.pinned ? -1 : 1
+      return a.name.localeCompare(b.name, 'zh-CN')
+    }),
+    [nodes],
   )
   const latestAllFiles = () => useRootFolderStore
     .getState()
@@ -71,7 +81,7 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
 
   return (
     <div className="folder-tree" role={depth === 0 ? 'tree' : 'group'}>
-      {nodes.map((node) => {
+      {orderedNodes.map((node) => {
         const expanded = expandedIds.has(node.id)
         if (node.kind === 'directory') {
           const fileCount = countViewableFiles(node.children ?? [])
@@ -152,6 +162,21 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
             setRenameTarget(menu.node)
             setMenu(null)
           }}
+          onDuplicate={menu.node.kind === 'file' ? () => {
+            void duplicateFile(menu.node.id)
+              .then(async (nextId) => {
+                if (rootFolderId && isTauriRuntime()) await refreshRootFolder(rootFolderId)
+                showToast(nextId ? '已在同一文件夹复制文件' : '复制失败')
+              })
+              .catch(() => showToast('复制文件失败'))
+            setMenu(null)
+          } : undefined}
+          onTogglePin={menu.node.kind === 'file' ? () => {
+            togglePinnedFile(menu.node.id)
+            showToast(menu.node.pinned ? '已取消置顶' : '已置顶文件')
+            setMenu(null)
+          } : undefined}
+          pinLabel={menu.node.pinned ? '取消置顶' : '置顶文件'}
           onNewFolder={menu.node.kind === 'directory' ? () => {
             const name = window.prompt('新建文件夹名称', '新建文件夹')
             void createMockSubfolder(menu.node.id, name ?? undefined)

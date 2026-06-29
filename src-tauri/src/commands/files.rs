@@ -52,6 +52,7 @@ fn file_node_from_path(path: &Path) -> FileTreeNode {
         updated_at,
         created_at,
         size,
+        pinned: None,
     }
 }
 
@@ -506,4 +507,60 @@ pub fn rename_path(old_path: String, new_name: String) -> Result<String, String>
     }
     fs::rename(old, &new_path).map_err(|err| err.to_string())?;
     Ok(path_to_string(&new_path))
+}
+
+#[tauri::command]
+pub fn duplicate_file(path: String) -> Result<FileTreeNode, String> {
+    let source = Path::new(&path);
+    if !source.exists() {
+        return Err("要复制的文件不存在".to_string());
+    }
+    if !source.is_file() {
+        return Err("当前只支持复制文件".to_string());
+    }
+    if should_ignore(source) {
+        return Err("该路径不允许复制".to_string());
+    }
+
+    let parent = source.parent().ok_or_else(|| "无法获取父目录".to_string())?;
+    let stem = source
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("副本");
+    let source_extension = source.extension().and_then(|value| value.to_str());
+
+    let mut target = parent.join(match source_extension {
+        Some(ext) => format!("{stem} 副本.{ext}"),
+        None => format!("{stem} 副本"),
+    });
+    for index in 2..10_000 {
+        if !target.exists() {
+            break;
+        }
+        target = parent.join(match source_extension {
+            Some(ext) => format!("{stem} 副本 {index}.{ext}"),
+            None => format!("{stem} 副本 {index}"),
+        });
+    }
+    if target.exists() {
+        return Err("无法生成可用的副本文件名".to_string());
+    }
+    if should_ignore(&target) {
+        return Err("目标名称不允许使用".to_string());
+    }
+
+    fs::copy(source, &target).map_err(|err| err.to_string())?;
+    let (created_at, updated_at, size) = metadata_times(&target);
+    Ok(FileTreeNode {
+        id: path_to_string(&target),
+        name: path_file_name(&target),
+        path: path_to_string(&target),
+        kind: FileTreeKind::File,
+        extension: extension(&target),
+        children: None,
+        updated_at,
+        created_at,
+        size,
+        pinned: None,
+    })
 }

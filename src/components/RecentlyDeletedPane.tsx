@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { RotateCcw, Trash2 } from 'lucide-react'
 import { useEditorStore } from '../stores/editorStore'
 import { useRecentlyDeletedStore } from '../stores/recentlyDeletedStore'
@@ -7,6 +8,7 @@ import { extractMarkdownSummary } from '../utils/extractMarkdownSummary'
 import { showToast } from './Toast'
 
 export function RecentlyDeletedPane() {
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const files = useRecentlyDeletedStore((state) => state.recentlyDeletedFiles)
   const restoreDeletedFile = useRecentlyDeletedStore((state) => state.restoreDeletedFile)
   const permanentlyDeleteFile = useRecentlyDeletedStore((state) => state.permanentlyDeleteFile)
@@ -17,6 +19,11 @@ export function RecentlyDeletedPane() {
 
   const rootFor = (originalPath: string) =>
     folders.find((folder) => originalPath.startsWith(folder.path))
+
+  const rootForDeleted = (file: { originalPath: string; originalRootFolderId?: string; trashPath?: string }) =>
+    folders.find((folder) => folder.id === file.originalRootFolderId)
+    ?? rootFor(file.originalPath)
+    ?? folders.find((folder) => Boolean(file.trashPath?.startsWith(`${folder.path}/.jsondown-trash/`)))
 
   return (
     <div className="deleted-list">
@@ -29,7 +36,7 @@ export function RecentlyDeletedPane() {
             <button
               onClick={() => {
                 void (async () => {
-                  const root = rootFor(file.originalPath)
+                  const root = rootForDeleted(file)
                   const restored = await restoreDeletedFile(file.id, root?.path)
                   if (!restored) return
                   if (isTauriRuntime()) {
@@ -49,13 +56,24 @@ export function RecentlyDeletedPane() {
             </button>
             <button
               className="danger"
+              disabled={deletingId === file.id}
               onClick={() => {
-                if (!window.confirm(`永久删除“${file.name}”？此操作不可撤销。`)) return
-                void permanentlyDeleteFile(file.id, rootFor(file.originalPath)?.path)
-                  .then(() => showToast('已永久删除项目'))
+                const root = rootForDeleted(file)
+                const rootPaths = folders.map((folder) => folder.path)
+                setDeletingId(file.id)
+                void permanentlyDeleteFile(file.id, root?.path, rootPaths)
+                  .then(async () => {
+                    if (isTauriRuntime()) await useRecentlyDeletedStore.getState().loadRecentlyDeleted(rootPaths)
+                    showToast('已移到系统废纸篓')
+                  })
+                  .catch((error) => {
+                    if (import.meta.env.DEV) console.warn('[recently-deleted:permanent-delete-failed]', error)
+                    showToast('永久删除失败')
+                  })
+                  .finally(() => setDeletingId((current) => (current === file.id ? null : current)))
               }}
             >
-              <Trash2 size={12} />永久删除
+              <Trash2 size={12} />{deletingId === file.id ? '删除中' : '永久删除'}
             </button>
           </div>
         </article>

@@ -7,8 +7,8 @@ export type AppConfig = {
   selectedRootFolderId?: string
   selectedFolderPath?: string
   selectedFilePath?: string
+  pinnedFilePaths?: string[]
   layoutDensity?: LayoutDensity
   editorTheme?: EditorTheme
   sidebarCollapsed?: boolean
 }
-

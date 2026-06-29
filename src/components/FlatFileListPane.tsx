@@ -41,6 +41,8 @@ export function FlatFileListPane() {
   const folders = useRootFolderStore((state) => state.folders)
   const activeFolderId = useRootFolderStore((state) => state.activeFolderId)
   const renameFile = useRootFolderStore((state) => state.renameFile)
+  const duplicateFile = useRootFolderStore((state) => state.duplicateFile)
+  const togglePinnedFile = useRootFolderStore((state) => state.togglePinnedFile)
   const removeFile = useRootFolderStore((state) => state.removeFile)
   const refreshRootFolder = useRootFolderStore((state) => state.refreshRootFolder)
   const selectFolder = useRootFolderStore((state) => state.selectFolder)
@@ -90,6 +92,7 @@ export function FlatFileListPane() {
           || previewText.includes(needle)
       })
       .sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
         if (sortMode === 'updatedAt-desc') return (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')
         if (sortMode === 'updatedAt-asc') return (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')
         if (sortMode === 'createdAt-desc') return (b.createdAt ?? '').localeCompare(a.createdAt ?? '')
@@ -260,6 +263,22 @@ export function FlatFileListPane() {
             showToast('已复制 Mock 路径')
             setMenu(null)
           }}
+          onDuplicate={() => {
+            void duplicateFile(menu.file.id)
+              .then(async (nextId) => {
+                const root = folders.find((folder) => folder.id === menu.file.rootFolderId)
+                if (root && isTauriRuntime()) await refreshRootFolder(root.id)
+                showToast(nextId ? '已在同一文件夹复制文件' : '复制失败')
+              })
+              .catch(() => showToast('复制文件失败'))
+            setMenu(null)
+          }}
+          onTogglePin={() => {
+            togglePinnedFile(menu.file.id)
+            showToast(menu.file.pinned ? '已取消置顶' : '已置顶文件')
+            setMenu(null)
+          }}
+          pinLabel={menu.file.pinned ? '取消置顶' : '置顶文件'}
           onRename={() => {
             setRenameTarget(menu.file)
             setMenu(null)

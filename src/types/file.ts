@@ -20,6 +20,7 @@ export type EditableFile = {
   createdAt?: string
   updatedAt?: string
   size?: number
+  pinned?: boolean
 }
 
 export type SortMode =

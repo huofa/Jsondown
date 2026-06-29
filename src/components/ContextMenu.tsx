@@ -1,10 +1,13 @@
 import {
   Clipboard,
+  Copy,
   ExternalLink,
   FilePlus2,
   FolderInput,
   FolderPlus,
   Pencil,
+  Pin,
+  PinOff,
   RefreshCw,
   Trash2,
 } from 'lucide-react'
@@ -17,6 +20,8 @@ type ContextMenuProps = {
   onClose: () => void
   onOpenInFinder?: () => void
   onCopyPath?: () => void
+  onDuplicate?: () => void
+  onTogglePin?: () => void
   onRename?: () => void
   onNewFolder?: () => void
   onNewFile?: () => void
@@ -27,6 +32,7 @@ type ContextMenuProps = {
   newFileDisabledTitle?: string
   renameLabel?: string
   deleteLabel?: string
+  pinLabel?: string
 }
 
 export function ContextMenu({
@@ -35,6 +41,8 @@ export function ContextMenu({
   onClose,
   onOpenInFinder,
   onCopyPath,
+  onDuplicate,
+  onTogglePin,
   onRename,
   onNewFolder,
   onNewFile,
@@ -45,6 +53,7 @@ export function ContextMenu({
   newFileDisabledTitle,
   renameLabel = '重命名',
   deleteLabel = '删除入口',
+  pinLabel = '置顶文件',
 }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState({ x, y })
@@ -57,7 +66,7 @@ export function ContextMenu({
     const nextX = Math.max(padding, Math.min(x, window.innerWidth - rect.width - padding))
     const nextY = Math.max(padding, Math.min(y, window.innerHeight - rect.height - padding))
     setPosition({ x: nextX, y: nextY })
-  }, [x, y, onOpenInFinder, onCopyPath, onRename, onNewFolder, onNewFile, onImportFolder, onRefresh, onDelete])
+  }, [x, y, onOpenInFinder, onCopyPath, onDuplicate, onTogglePin, onRename, onNewFolder, onNewFile, onImportFolder, onRefresh, onDelete])
 
   useEffect(() => {
     const close = (event: MouseEvent) => {
@@ -75,6 +84,12 @@ export function ContextMenu({
     <div ref={ref} className="context-menu" style={{ left: position.x, top: position.y }}>
       {onOpenInFinder && <button onClick={onOpenInFinder}><ExternalLink size={14} />在访达中打开</button>}
       {onCopyPath && <button onClick={onCopyPath}><Clipboard size={14} />复制路径</button>}
+      {onDuplicate && <button onClick={onDuplicate}><Copy size={14} />复制文件</button>}
+      {onTogglePin && (
+        <button onClick={onTogglePin}>
+          {pinLabel.startsWith('取消') ? <PinOff size={14} /> : <Pin size={14} />}{pinLabel}
+        </button>
+      )}
       {onRename && <button onClick={onRename}><Pencil size={14} />{renameLabel}</button>}
       {onNewFolder && <button onClick={onNewFolder}><FolderPlus size={14} />新建文件夹</button>}
       {onNewFile && (
