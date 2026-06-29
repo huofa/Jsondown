@@ -56,6 +56,7 @@ const fallbackConfig: AppConfig = {
   selectedRootFolderId: mockRootFolders[0]?.id,
   pinnedFilePaths: [],
   layoutDensity: 'comfortable',
+  customEditorLayout: undefined,
   editorTheme: 'paper-white',
   sidebarCollapsed: false,
 }
@@ -204,7 +205,8 @@ export async function loadAppConfig(): Promise<AppConfig> {
 
 export async function saveAppConfig(config: AppConfig): Promise<void> {
   if (!isTauriRuntime()) return
-  return invoke<void>('save_app_config', { config })
+  const existing = await loadAppConfig().catch(() => fallbackConfig)
+  return invoke<void>('save_app_config', { config: { ...existing, ...config } })
 }
 
 export async function createChildFolder(parentPath: string, folderName: string): Promise<FileTreeNode> {

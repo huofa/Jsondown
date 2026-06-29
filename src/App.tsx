@@ -23,6 +23,7 @@ export default function App() {
   const setSaveStatus = useEditorStore((state) => state.setSaveStatus)
   const layoutDensity = useSettingsStore((state) => state.layoutDensity)
   const customEditorLayout = useSettingsStore((state) => state.customEditorLayout)
+  const initializeSettings = useSettingsStore((state) => state.initializeSettings)
   const loadRecentlyDeleted = useRecentlyDeletedStore((state) => state.loadRecentlyDeleted)
   const watcherRefreshTimer = useRef<number | undefined>(undefined)
   const foldersRef = useRef(folders)
@@ -34,6 +35,10 @@ export default function App() {
   useEffect(() => {
     void initialize()
   }, [initialize])
+
+  useEffect(() => {
+    void initializeSettings()
+  }, [initializeSettings])
 
   useEffect(() => {
     const refreshAfterPendingDelete = (event: Event) => {
