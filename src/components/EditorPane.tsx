@@ -163,12 +163,10 @@ export function EditorPane() {
       if (saveStatus === 'dirty') {
         void saveFileContent(file.id, file.path).finally(() => {
           setEditingFileId(null)
-          setEditorApi(null)
         })
         return
       }
       setEditingFileId(null)
-      setEditorApi(null)
     }
     window.addEventListener('jsondown:exit-editing', exitEditing)
     return () => window.removeEventListener('jsondown:exit-editing', exitEditing)
