@@ -18,9 +18,28 @@ export const PlainTextCodeEditor = forwardRef<PlainTextCodeEditorHandle, PlainTe
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const selectionRef = useRef<{ start: number; end: number } | null>(null)
 
+    const resizeToContent = () => {
+      const textarea = textareaRef.current
+      if (!textarea) return
+      const scrollParent = textarea.closest('.editor-scroll') as HTMLElement | null
+      const parentScrollTop = scrollParent?.scrollTop ?? 0
+
+      textarea.style.height = 'auto'
+      textarea.style.height = `${textarea.scrollHeight}px`
+      textarea.scrollTop = 0
+
+      if (scrollParent) {
+        scrollParent.scrollTop = Math.min(
+          parentScrollTop,
+          Math.max(0, scrollParent.scrollHeight - scrollParent.clientHeight),
+        )
+      }
+    }
+
     const rememberSelection = () => {
       const textarea = textareaRef.current
       if (!textarea) return false
+      textarea.scrollTop = 0
       selectionRef.current = {
         start: textarea.selectionStart,
         end: textarea.selectionEnd,
@@ -52,6 +71,7 @@ export const PlainTextCodeEditor = forwardRef<PlainTextCodeEditorHandle, PlainTe
       window.requestAnimationFrame(() => {
         textarea.focus()
         textarea.setSelectionRange(nextCursor, nextCursor)
+        resizeToContent()
         selectionRef.current = { start: nextCursor, end: nextCursor }
       })
 
@@ -69,10 +89,15 @@ export const PlainTextCodeEditor = forwardRef<PlainTextCodeEditorHandle, PlainTe
       window.requestAnimationFrame(focusStart)
     }, [autoFocusStart, readOnly])
 
+    useLayoutEffect(() => {
+      resizeToContent()
+    }, [value])
+
     return (
       <textarea
         ref={textareaRef}
         className="plain-text-code-editor"
+        rows={1}
         value={value}
         readOnly={readOnly}
         spellCheck={false}
@@ -80,7 +105,10 @@ export const PlainTextCodeEditor = forwardRef<PlainTextCodeEditorHandle, PlainTe
         onKeyUp={rememberSelection}
         onMouseUp={rememberSelection}
         onSelect={rememberSelection}
-        onChange={(event) => onChange(event.currentTarget.value)}
+        onChange={(event) => {
+          onChange(event.currentTarget.value)
+          window.requestAnimationFrame(resizeToContent)
+        }}
       />
     )
   },

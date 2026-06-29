@@ -554,17 +554,18 @@ body.jsondown-editor-mode-editing .file-card.is-active {
   background: #f7f7f7;
 }
 .plain-text-code-shell {
-  min-height: calc(100vh - 88px);
+  min-height: 0;
 }
 .plain-text-code-editor {
   display: block;
   width: 100%;
-  min-height: calc(100vh - 110px);
+  min-height: 1lh;
   padding: 0;
   border: 0;
   border-radius: 0;
   outline: none;
   resize: none;
+  overflow: hidden;
   color: #111;
   background: transparent;
   box-shadow: none;

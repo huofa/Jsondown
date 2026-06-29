@@ -246,6 +246,9 @@ export function EditorPane() {
     const scroll = editorScrollRef.current
     const beforeTop = scroll?.scrollTop ?? 0
     const beforeHeight = scroll?.scrollHeight ?? 0
+    const beforeClientHeight = scroll?.clientHeight ?? 0
+    const bottomFollowThreshold = Math.max(160, beforeClientHeight * 0.28)
+    const wasNearBottom = beforeHeight - beforeTop - beforeClientHeight <= bottomFollowThreshold
 
     updateContent(id, markdown)
 
@@ -253,18 +256,25 @@ export function EditorPane() {
       const current = editorScrollRef.current
       if (!current) return
       const maxTop = Math.max(0, current.scrollHeight - current.clientHeight)
-      const addedHeight = Math.max(0, current.scrollHeight - beforeHeight)
 
-      // 只有在内容高度增长（按了 Enter 新建行）且用户原本位于底部时，才允许自然滚动跟随
-      if (addedHeight > 0 && beforeTop + current.clientHeight >= beforeHeight - 80) {
-        current.scrollTop = Math.min(maxTop, beforeTop + addedHeight)
+      // 如果输入前光标所在区域已经贴近底部，输入换行后要像备忘录一样让内容上移、光标保持可见。
+      if (wasNearBottom) {
+        current.scrollTop = maxTop
       } else {
-        // 否则始终精确恢复滚动位置，确保输入字符时画面不动
+        // 否则保持用户原本视野，不因为自动高度调整跳动。
         current.scrollTop = Math.min(beforeTop, maxTop)
       }
     }
 
-    window.requestAnimationFrame(restoreScroll)
+    const scheduleRestoreScroll = () => {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(restoreScroll)
+      })
+    }
+
+    scheduleRestoreScroll()
+    window.setTimeout(scheduleRestoreScroll, 40)
+    window.setTimeout(scheduleRestoreScroll, 120)
   }
 
   const rememberTemplateSelection = () => {
