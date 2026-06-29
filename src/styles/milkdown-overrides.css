@@ -120,6 +120,8 @@
 .milkdown-host .ProseMirror ol { counter-reset: jsondown-ordered-list; }
 .milkdown-host .ProseMirror ol > li {
   counter-increment: jsondown-ordered-list;
+  margin-top: 0;
+  margin-bottom: max(var(--jd-list-row-margin-bottom), 0.08em);
   padding-left: .82em;
 }
 .milkdown-host .ProseMirror ol > li::before {
