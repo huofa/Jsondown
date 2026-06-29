@@ -6,13 +6,18 @@ import { useRootFolderStore } from '../stores/rootFolderStore'
 export function RecentlyDeletedEntry() {
   const selected = useRootFolderStore((state) => state.activeFolderId) === 'recently-deleted'
   const selectFolder = useRootFolderStore((state) => state.selectFolder)
+  const folders = useRootFolderStore((state) => state.folders)
   const runAfterPendingCleanup = useEditorStore((state) => state.runAfterPendingCleanup)
   const count = useRecentlyDeletedStore((state) => state.recentlyDeletedFiles.length)
+  const loadRecentlyDeleted = useRecentlyDeletedStore((state) => state.loadRecentlyDeleted)
   return (
     <button
       className={`system-folder-row recently-deleted-entry ${selected ? 'is-active' : ''}`}
       onClick={() => {
-        void runAfterPendingCleanup(() => selectFolder('recently-deleted'))
+        void runAfterPendingCleanup(async () => {
+          await loadRecentlyDeleted(folders.map((folder) => folder.path))
+          selectFolder('recently-deleted')
+        })
       }}
     >
       <span className="recently-deleted-drag-spacer" />

@@ -270,9 +270,22 @@ export function FlatFileListPane() {
               if (!root || !menu.file.rootFolderId) return
               const parentId = findParentFolderId(root.tree ?? [], menu.file.id)
               if (isTauriRuntime()) {
-                await movePathToRecentlyDeleted(menu.file.path, root.path)
+                const deleted = await movePathToRecentlyDeleted(menu.file.path, root.path)
+                moveToRecentlyDeleted({
+                  ...deleted,
+                  originalRootFolderId: menu.file.rootFolderId,
+                  originalParentId: parentId,
+                  editable: menu.file.editable,
+                  node: {
+                    id: menu.file.id,
+                    name: menu.file.name,
+                    path: menu.file.path,
+                    kind: 'file',
+                    extension: menu.file.extension,
+                  },
+                })
                 await refreshRootFolder(root.id)
-                await loadRecentlyDeleted(folders.map((folder) => folder.path))
+                await loadRecentlyDeleted(useRootFolderStore.getState().folders.map((folder) => folder.path))
               } else {
                 moveToRecentlyDeleted({
                   id: menu.file.id,
