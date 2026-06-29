@@ -40,11 +40,22 @@ export const useRecentlyDeletedStore = create<RecentlyDeletedState>((set, get) =
   recentlyDeletedFiles: isTauriRuntime() ? [] : initialDeleted,
   loadRecentlyDeleted: async (rootPaths) => {
     if (!isTauriRuntime()) return
-    const files = await listRecentlyDeleted(rootPaths)
-    set({ recentlyDeletedFiles: files })
+    if (rootPaths.length === 0) return
+    try {
+      const files = await listRecentlyDeleted(rootPaths)
+      if (files.length === 0 && get().recentlyDeletedFiles.length > 0) {
+        console.warn('[recently-deleted:skip-empty-overwrite]', { rootPaths })
+        return
+      }
+      set({ recentlyDeletedFiles: files })
+    } catch (error) {
+      console.warn('[recently-deleted:load-failed]', error)
+    }
   },
   moveToRecentlyDeleted: (file) =>
-    set((state) => ({ recentlyDeletedFiles: [file, ...state.recentlyDeletedFiles] })),
+    set((state) => ({
+      recentlyDeletedFiles: [file, ...state.recentlyDeletedFiles.filter((item) => item.id !== file.id)],
+    })),
   restoreDeletedFile: async (fileId, rootPath) => {
     if (isTauriRuntime()) {
       if (!rootPath) return null
@@ -72,4 +83,3 @@ export const useRecentlyDeletedStore = create<RecentlyDeletedState>((set, get) =
     }))
   },
 }))
-

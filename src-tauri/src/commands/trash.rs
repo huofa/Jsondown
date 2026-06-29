@@ -31,8 +31,13 @@ pub fn move_to_recently_deleted(path: String, root_path: String) -> Result<Delet
 pub fn list_recently_deleted(root_paths: Vec<String>) -> Result<Vec<DeletedFile>, String> {
     let mut items = Vec::new();
     for root_path in root_paths {
-        let index = read_trash_index(Path::new(&root_path))?;
-        items.extend(index.items);
+        match read_trash_index(Path::new(&root_path)) {
+            Ok(index) => items.extend(index.items),
+            Err(err) => eprintln!(
+                "[recently-deleted:list] skip unreadable trash index for {}: {}",
+                root_path, err
+            ),
+        }
     }
     items.sort_by(|a, b| b.deleted_at.cmp(&a.deleted_at));
     Ok(items)
@@ -76,4 +81,3 @@ pub fn permanently_delete_trash_item(trash_id: String, root_path: String) -> Res
     }
     write_trash_index(root, &index)
 }
-

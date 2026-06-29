@@ -175,9 +175,17 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
               if (!root || !rootFolderId) return
               const parentId = findParentFolderId(root.tree ?? [], menu.node.id)
               if (isTauriRuntime()) {
-                await movePathToRecentlyDeleted(menu.node.path, root.path)
+                const deleted = await movePathToRecentlyDeleted(menu.node.path, root.path)
+                moveToRecentlyDeleted({
+                  ...deleted,
+                  originalRootFolderId: rootFolderId,
+                  originalParentId: parentId,
+                  extension: menu.node.extension ?? deleted.extension,
+                  editable: menu.node.kind === 'file' && isViewableFile(menu.node.name),
+                  node: menu.node,
+                })
                 await refreshRootFolder(root.id)
-                await loadRecentlyDeleted(folders.map((folder) => folder.path))
+                await loadRecentlyDeleted(useRootFolderStore.getState().folders.map((folder) => folder.path))
               } else {
                 moveToRecentlyDeleted({
                   id: menu.node.id,
