@@ -1,13 +1,14 @@
 import { AlignJustify, ChevronDown } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useSettingsStore } from '../stores/settingsStore'
+import { showToast } from './Toast'
 
 export function LayoutDensitySwitcher() {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const customEditorLayout = useSettingsStore((state) => state.customEditorLayout)
   const setCustomEditorLayout = useSettingsStore((state) => state.setCustomEditorLayout)
-  const resetCustomEditorLayout = useSettingsStore((state) => state.resetCustomEditorLayout)
+  const saveCustomEditorLayoutAsDefault = useSettingsStore((state) => state.saveCustomEditorLayoutAsDefault)
 
   useEffect(() => {
     if (!open) return
@@ -88,7 +89,16 @@ export function LayoutDensitySwitcher() {
                 onChange={(event) => setCustomEditorLayout({ horizontalPadding: Number(event.target.value) })}
               />
             </label>
-            <button className="density-reset" onClick={resetCustomEditorLayout}>恢复默认</button>
+            <button
+              className="density-reset"
+              onClick={() => {
+                void saveCustomEditorLayoutAsDefault()
+                  .then(() => showToast('已设为默认排版'))
+                  .catch(() => showToast('设为默认失败'))
+              }}
+            >
+              设为默认
+            </button>
           </div>
         </div>
       )}

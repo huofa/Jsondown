@@ -11,6 +11,7 @@ pub struct AppConfig {
     pub selected_file_path: Option<String>,
     pub pinned_file_paths: Option<Vec<String>>,
     pub layout_density: Option<String>,
+    pub custom_editor_layout: Option<serde_json::Value>,
     pub editor_theme: Option<String>,
     pub sidebar_collapsed: Option<bool>,
 }

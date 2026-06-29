@@ -1,6 +1,6 @@
 import type { RootFolder } from './rootFolder'
 import type { EditorTheme } from './editor'
-import type { LayoutDensity } from './settings'
+import type { CustomEditorLayout, LayoutDensity } from './settings'
 
 export type AppConfig = {
   rootFolders: RootFolder[]
@@ -9,6 +9,7 @@ export type AppConfig = {
   selectedFilePath?: string
   pinnedFilePaths?: string[]
   layoutDensity?: LayoutDensity
+  customEditorLayout?: CustomEditorLayout
   editorTheme?: EditorTheme
   sidebarCollapsed?: boolean
 }
