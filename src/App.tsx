@@ -88,6 +88,10 @@ export default function App() {
   return (
     <div
       className={`app-frame density-${layoutDensity}`}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        window.getSelection()?.removeAllRanges()
+      }}
       style={{
         '--custom-editor-font-size': `${customEditorLayout.fontSize}px`,
         '--custom-editor-line-height': String(customEditorLayout.lineHeight),

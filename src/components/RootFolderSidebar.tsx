@@ -147,6 +147,7 @@ export function RootFolderSidebar() {
   const openFolderMenu = (event: MouseEvent, folder: RootFolder) => {
     event.preventDefault()
     event.stopPropagation()
+    window.getSelection()?.removeAllRanges()
     setMenu({ x: event.clientX, y: event.clientY, folder })
   }
 
@@ -169,6 +170,12 @@ export function RootFolderSidebar() {
       <div className="sidebar-scroll">
         <div
           className={`system-folder-row all-files-row ${activeFolderId === 'all' ? 'is-active' : ''}`}
+          onContextMenu={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            window.getSelection()?.removeAllRanges()
+            setAllMenu({ x: event.clientX, y: event.clientY })
+          }}
           onClick={() => {
             void runAfterPendingCleanup(() => selectFolder('all'))
           }}
@@ -211,6 +218,7 @@ export function RootFolderSidebar() {
               >
                 <div
                   className="root-folder-row"
+                  onContextMenu={(event) => openFolderMenu(event, folder)}
                   onPointerDown={(event: ReactPointerEvent<HTMLDivElement>) => startRootFolderDrag(event, folder.id)}
                   onClickCapture={(event) => {
                     if (!suppressNextRootClickRef.current) return
