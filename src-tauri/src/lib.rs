@@ -6,6 +6,7 @@ use commands::{
     config::{load_app_config, save_app_config},
     files::{
         backup_text_file, create_file, create_unique_markdown_file, delete_empty_file_if_exists,
+        duplicate_file,
         read_file_preview, read_file_chunk, read_text_file, rename_path, write_text_file,
     },
     finder::reveal_in_finder,
@@ -41,6 +42,7 @@ pub fn run() {
             create_unique_markdown_file,
             delete_empty_file_if_exists,
             rename_path,
+            duplicate_file,
             move_to_recently_deleted,
             list_recently_deleted,
             restore_deleted_file,

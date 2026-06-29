@@ -1,4 +1,4 @@
-import { Folder } from 'lucide-react'
+import { Folder, Pin } from 'lucide-react'
 import type { MouseEvent } from 'react'
 import type { FilePreviewPayload } from '../services/tauriFileService'
 import type { FilePreviewStatus } from '../stores/filePreviewStore'
@@ -60,7 +60,10 @@ export function FileCard({
       role="option"
       aria-selected={selected}
     >
-      <span className="file-card-title">{title}</span>
+      <span className="file-card-title">
+        {title}
+        {file.pinned && <span className="file-pinned-mark" title="置顶文件"><Pin size={10} /></span>}
+      </span>
       <span className="file-card-summary">{summary}</span>
       <span className="file-card-footer">
         <time title={`创建：${fullTime(file.createdAt)}\n修改：${fullTime(file.updatedAt)}`}>

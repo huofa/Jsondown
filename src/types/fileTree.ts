@@ -8,4 +8,5 @@ export type FileTreeNode = {
   updatedAt?: string
   createdAt?: string
   size?: number
+  pinned?: boolean
 }

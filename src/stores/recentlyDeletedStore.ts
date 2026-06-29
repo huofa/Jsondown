@@ -33,7 +33,7 @@ type RecentlyDeletedState = {
   loadRecentlyDeleted: (rootPaths: string[]) => Promise<void>
   moveToRecentlyDeleted: (file: DeletedFile) => void
   restoreDeletedFile: (fileId: string, rootPath?: string) => Promise<DeletedFile | null>
-  permanentlyDeleteFile: (fileId: string, rootPath?: string) => Promise<void>
+  permanentlyDeleteFile: (fileId: string, rootPath?: string, fallbackRootPaths?: string[]) => Promise<void>
 }
 
 export const useRecentlyDeletedStore = create<RecentlyDeletedState>((set, get) => ({
@@ -43,10 +43,6 @@ export const useRecentlyDeletedStore = create<RecentlyDeletedState>((set, get) =
     if (rootPaths.length === 0) return
     try {
       const files = await listRecentlyDeleted(rootPaths)
-      if (files.length === 0 && get().recentlyDeletedFiles.length > 0) {
-        console.warn('[recently-deleted:skip-empty-overwrite]', { rootPaths })
-        return
-      }
       set({ recentlyDeletedFiles: files })
     } catch (error) {
       console.warn('[recently-deleted:load-failed]', error)
@@ -74,9 +70,21 @@ export const useRecentlyDeletedStore = create<RecentlyDeletedState>((set, get) =
     }
     return file
   },
-  permanentlyDeleteFile: async (fileId, rootPath) => {
-    if (isTauriRuntime() && rootPath) {
-      await permanentlyDeleteTrashItem(fileId, rootPath)
+  permanentlyDeleteFile: async (fileId, rootPath, fallbackRootPaths = []) => {
+    if (isTauriRuntime()) {
+      const candidates = Array.from(new Set([rootPath, ...fallbackRootPaths].filter(Boolean))) as string[]
+      if (candidates.length === 0) throw new Error('无法定位最近删除所属资料夹')
+      let lastError: unknown = null
+      for (const candidate of candidates) {
+        try {
+          await permanentlyDeleteTrashItem(fileId, candidate)
+          lastError = null
+          break
+        } catch (error) {
+          lastError = error
+        }
+      }
+      if (lastError) throw lastError
     }
     set((state) => ({
       recentlyDeletedFiles: state.recentlyDeletedFiles.filter((item) => item.id !== fileId),

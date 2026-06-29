@@ -51,6 +51,7 @@ pub fn scan_tree(path: &Path) -> Result<Vec<FileTreeNode>, String> {
                 updated_at,
                 created_at,
                 size,
+                pinned: None,
             });
         } else if is_viewable_file(&entry_path) {
             let (created_at, updated_at, size) = metadata_times(&entry_path);
@@ -64,6 +65,7 @@ pub fn scan_tree(path: &Path) -> Result<Vec<FileTreeNode>, String> {
                 updated_at,
                 created_at,
                 size,
+                pinned: None,
             });
         }
     }
@@ -124,5 +126,6 @@ pub fn create_child_folder(parent_path: String, folder_name: String) -> Result<F
         updated_at,
         created_at,
         size,
+        pinned: None,
     })
 }

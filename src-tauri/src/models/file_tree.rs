@@ -12,6 +12,7 @@ pub struct FileTreeNode {
     pub updated_at: Option<String>,
     pub created_at: Option<String>,
     pub size: Option<u64>,
+    pub pinned: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,4 +21,3 @@ pub enum FileTreeKind {
     File,
     Directory,
 }
-

@@ -31,6 +31,7 @@ export function flattenFiles(nodes: FileTreeNode[], rootPath: string, rootFolder
         createdAt: node.createdAt ?? meta?.createdAt,
         updatedAt: node.updatedAt ?? meta?.updatedAt,
         size: node.size ?? meta?.size,
+        pinned: node.pinned,
       })
     })
   }

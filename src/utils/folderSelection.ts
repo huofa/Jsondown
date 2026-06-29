@@ -36,6 +36,7 @@ function directFiles(
       createdAt: node.createdAt ?? meta?.createdAt,
       updatedAt: node.updatedAt ?? meta?.updatedAt,
       size: node.size ?? meta?.size,
+      pinned: node.pinned,
     }]
   })
 }

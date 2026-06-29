@@ -5,6 +5,7 @@ import {
   createChildFolder,
   createFile,
   createUniqueMarkdownFile,
+  duplicateFile as duplicateFileOnDisk,
   isTauriRuntime,
   loadAppConfig,
   readDirectoryTree,
@@ -19,6 +20,7 @@ import { createMockFolder, mockFileContents, mockFileMeta, mockRootFolders } fro
 type RootFolderState = {
   folders: RootFolder[]
   activeFolderId: string | null
+  pinnedFilePaths: string[]
   initialized: boolean
   initialize: () => Promise<void>
   addRootFolderFromDialog: () => Promise<RootFolder | null>
@@ -34,6 +36,8 @@ type RootFolderState = {
   renameFolder: (id: string, name: string) => void
   renameTreeFolder: (id: string, name: string) => Promise<void>
   renameFile: (id: string, name: string) => Promise<string | null>
+  duplicateFile: (id: string) => Promise<string | null>
+  togglePinnedFile: (id: string) => void
   removeFile: (id: string) => void
   removeTreeNode: (id: string) => void
   restoreFile: (rootFolderId: string, parentId: string | undefined, node: FileTreeNode) => void
@@ -151,28 +155,56 @@ const findPathForSelection = (folders: RootFolder[], id?: string | null) => {
   return folders[0]?.path
 }
 
-const saveFolders = (folders: RootFolder[], activeFolderId: string | null) => {
+const applyPinnedFiles = (nodes: FileTreeNode[], pinnedFilePaths: Set<string>): FileTreeNode[] =>
+  nodes.map((node) => {
+    if (node.kind === 'file') return { ...node, pinned: pinnedFilePaths.has(node.path) }
+    return node.children
+      ? { ...node, children: applyPinnedFiles(node.children, pinnedFilePaths) }
+      : node
+  })
+
+const applyPinnedToFolders = (folders: RootFolder[], pinnedFilePaths: string[]) => {
+  const pinned = new Set(pinnedFilePaths)
+  return folders.map((folder) => ({
+    ...folder,
+    tree: folder.tree ? applyPinnedFiles(folder.tree, pinned) : folder.tree,
+  }))
+}
+
+const collectNodeFilePaths = (node: FileTreeNode): string[] => {
+  if (node.kind === 'file') return [node.path]
+  return node.children?.flatMap(collectNodeFilePaths) ?? []
+}
+
+const saveFolders = (folders: RootFolder[], activeFolderId: string | null, pinnedFilePaths: string[] = []) => {
   void saveAppConfig({
     rootFolders: folders.map((folder, order) => ({ ...folder, order, tree: undefined })),
     selectedRootFolderId: activeFolderId ?? undefined,
+    pinnedFilePaths,
   })
 }
 
-const refreshFolder = async (folder: RootFolder): Promise<RootFolder> => ({
-  ...folder,
-  tree: await readDirectoryTree(folder.path),
-})
+const refreshFolder = async (folder: RootFolder, pinnedFilePaths: string[] = []): Promise<RootFolder> => {
+  const tree = await readDirectoryTree(folder.path)
+  return {
+    ...folder,
+    tree: applyPinnedFiles(tree, new Set(pinnedFilePaths)),
+  }
+}
 
 export const useRootFolderStore = create<RootFolderState>((set, get) => ({
   folders: isTauriRuntime() ? [] : mockRootFolders,
   activeFolderId: isTauriRuntime() ? null : mockRootFolders[0]?.id ?? null,
+  pinnedFilePaths: [],
   initialized: false,
   initialize: async () => {
     const config = await loadAppConfig()
-    const hydrated = await Promise.all((config.rootFolders ?? []).map(refreshFolder))
+    const pinnedFilePaths = config.pinnedFilePaths ?? []
+    const hydrated = await Promise.all((config.rootFolders ?? []).map((folder) => refreshFolder(folder, pinnedFilePaths)))
     set({
       folders: hydrated,
       activeFolderId: config.selectedRootFolderId ?? hydrated[0]?.id ?? 'all',
+      pinnedFilePaths,
       initialized: true,
     })
   },
@@ -184,20 +216,22 @@ export const useRootFolderStore = create<RootFolderState>((set, get) => ({
   },
   addRootFolder: async (folder) => {
     const withOrder = { ...folder, order: get().folders.length }
-    const hydrated = await refreshFolder(withOrder)
+    const hydrated = await refreshFolder(withOrder, get().pinnedFilePaths)
     const folders = [...get().folders.filter((item) => item.path !== hydrated.path), hydrated]
       .map((item, order) => ({ ...item, order }))
     set({ folders, activeFolderId: hydrated.id })
-    saveFolders(folders, hydrated.id)
+    saveFolders(folders, hydrated.id, get().pinnedFilePaths)
   },
   refreshRootFolder: async (rootFolderId) => {
+    const pinnedFilePaths = get().pinnedFilePaths
     const folders = await Promise.all(get().folders.map(async (folder) =>
-      folder.id === rootFolderId ? refreshFolder(folder) : folder,
+      folder.id === rootFolderId ? refreshFolder(folder, pinnedFilePaths) : folder,
     ))
     set({ folders })
   },
   refreshAllRootFolders: async () => {
-    const folders = await Promise.all(get().folders.map(refreshFolder))
+    const pinnedFilePaths = get().pinnedFilePaths
+    const folders = await Promise.all(get().folders.map((folder) => refreshFolder(folder, pinnedFilePaths)))
     set({ folders })
   },
   addMockFolder: (name) =>
@@ -206,7 +240,7 @@ export const useRootFolderStore = create<RootFolderState>((set, get) => ({
       const note = folder.tree?.[0]
       if (note) mockFileContents[note.id] = '# 未命名笔记\n\n从这里开始写。'
       const folders = [...state.folders, folder]
-      saveFolders(folders, folder.id)
+      saveFolders(folders, folder.id, state.pinnedFilePaths)
       return { folders, activeFolderId: folder.id }
     }),
   importMockFile: (folderId) => {
@@ -331,14 +365,14 @@ export const useRootFolderStore = create<RootFolderState>((set, get) => ({
     set((state) => {
       const folders = state.folders.filter((folder) => folder.id !== id)
       const activeFolderId = state.activeFolderId === id ? (folders[0]?.id ?? 'all') : state.activeFolderId
-      saveFolders(folders, activeFolderId)
+      saveFolders(folders, activeFolderId, state.pinnedFilePaths)
       return { folders, activeFolderId }
     }),
   renameFolder: (id, name) =>
     set((state) => {
       const folders = state.folders.map((folder) =>
         folder.id === id ? { ...folder, name: name.trim() || folder.name } : folder)
-      saveFolders(folders, state.activeFolderId)
+      saveFolders(folders, state.activeFolderId, state.pinnedFilePaths)
       return { folders }
     }),
   renameTreeFolder: async (id, name) => {
@@ -347,7 +381,7 @@ export const useRootFolderStore = create<RootFolderState>((set, get) => ({
     if (!root || !node) throw new Error('未找到要重命名的文件夹')
     if (isTauriRuntime()) {
       const nextPath = await renamePath(node.path, name)
-      const refreshed = await refreshFolder(root)
+      const refreshed = await refreshFolder(root, get().pinnedFilePaths)
       const nextNode = findNodeByPath(refreshed.tree ?? [], nextPath)
       set((state) => ({
         folders: state.folders.map((folder) => (folder.id === root.id ? refreshed : folder)),
@@ -374,11 +408,14 @@ export const useRootFolderStore = create<RootFolderState>((set, get) => ({
     const nextName = renameFileNameFor(node.name, name)
     if (isTauriRuntime()) {
       const nextPath = await renamePath(node.path, nextName)
-      const refreshed = await refreshFolder(root)
+      const nextPinnedFilePaths = get().pinnedFilePaths.map((path) => (path === node.path ? nextPath : path))
+      const refreshed = await refreshFolder(root, nextPinnedFilePaths)
       const nextNode = findNodeByPath(refreshed.tree ?? [], nextPath)
       set((state) => ({
         folders: state.folders.map((folder) => (folder.id === root.id ? refreshed : folder)),
+        pinnedFilePaths: nextPinnedFilePaths,
       }))
+      saveFolders(get().folders, get().activeFolderId, nextPinnedFilePaths)
       return nextNode?.id ?? nextPath
     }
     set((state) => {
@@ -394,15 +431,92 @@ export const useRootFolderStore = create<RootFolderState>((set, get) => ({
     })
     return `${node.path.slice(0, node.path.lastIndexOf('/'))}/${nextName}`
   },
+  duplicateFile: async (id) => {
+    const root = findRootForSelection(get().folders, id)
+    const node = root ? findNodeById(root.tree ?? [], id) : null
+    if (!root || !node || node.kind !== 'file') throw new Error('未找到要复制的文件')
+    if (isTauriRuntime()) {
+      const copied = await duplicateFileOnDisk(node.path)
+      await get().refreshRootFolder(root.id)
+      return copied.id
+    }
+
+    const sourceContent = mockFileContents[node.id] ?? mockFileContents[node.path] ?? ''
+    const dot = node.name.lastIndexOf('.')
+    const stem = dot > 0 ? node.name.slice(0, dot) : node.name
+    const extWithDot = dot > 0 ? node.name.slice(dot) : ''
+    const parentPath = node.path.slice(0, node.path.lastIndexOf('/'))
+    let copiedId: string | null = null
+    set((state) => {
+      const duplicateNodes = (nodes: FileTreeNode[]): FileTreeNode[] => {
+        const index = nodes.findIndex((item) => item.id === id || item.path === id)
+        if (index >= 0) {
+          const names = new Set(nodes.map((item) => item.name))
+          let copiedName = `${stem} 副本${extWithDot}`
+          for (let copyIndex = 2; names.has(copiedName); copyIndex += 1) {
+            copiedName = `${stem} 副本 ${copyIndex}${extWithDot}`
+          }
+          const path = `${parentPath}/${copiedName}`
+          copiedId = uniqueId('file-copy')
+          mockFileContents[copiedId] = sourceContent
+          mockFileMeta[path] = {
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            size: sourceContent.length,
+          }
+          const copied: FileTreeNode = {
+            ...node,
+            id: copiedId,
+            name: copiedName,
+            path,
+            pinned: false,
+          }
+          return [...nodes.slice(0, index + 1), copied, ...nodes.slice(index + 1)]
+        }
+        return nodes.map((item) => item.children ? { ...item, children: duplicateNodes(item.children) } : item)
+      }
+      return { folders: state.folders.map((folder) => ({ ...folder, tree: duplicateNodes(folder.tree ?? []) })) }
+    })
+    return copiedId
+  },
+  togglePinnedFile: (id) =>
+    set((state) => {
+      const root = findRootForSelection(state.folders, id)
+      const node = root ? findNodeById(root.tree ?? [], id) : null
+      if (!node || node.kind !== 'file') return state
+      const current = new Set(state.pinnedFilePaths)
+      if (current.has(node.path)) current.delete(node.path)
+      else current.add(node.path)
+      const pinnedFilePaths = Array.from(current)
+      const folders = applyPinnedToFolders(state.folders, pinnedFilePaths)
+      saveFolders(folders, state.activeFolderId, pinnedFilePaths)
+      return { folders, pinnedFilePaths }
+    }),
   removeFile: (id) =>
-    set((state) => ({
-      folders: state.folders.map((folder) => ({ ...folder, tree: removeNodeById(folder.tree ?? [], id) })),
-    })),
+    set((state) => {
+      const root = findRootForSelection(state.folders, id)
+      const node = root ? findNodeById(root.tree ?? [], id) : null
+      const pinnedFilePaths = node ? state.pinnedFilePaths.filter((path) => path !== node.path) : state.pinnedFilePaths
+      const folders = state.folders.map((folder) => ({ ...folder, tree: removeNodeById(folder.tree ?? [], id) }))
+      saveFolders(folders, state.activeFolderId, pinnedFilePaths)
+      return {
+        folders,
+        pinnedFilePaths,
+      }
+    }),
   removeTreeNode: (id) =>
-    set((state) => ({
-      folders: state.folders.map((folder) => ({ ...folder, tree: removeNodeById(folder.tree ?? [], id) })),
-      activeFolderId: state.activeFolderId === id ? 'all' : state.activeFolderId,
-    })),
+    set((state) => {
+      const root = findRootForSelection(state.folders, id)
+      const node = root ? findNodeById(root.tree ?? [], id) : null
+      const removedPaths = new Set(node ? collectNodeFilePaths(node) : [])
+      const pinnedFilePaths = removedPaths.size
+        ? state.pinnedFilePaths.filter((path) => !removedPaths.has(path))
+        : state.pinnedFilePaths
+      const folders = state.folders.map((folder) => ({ ...folder, tree: removeNodeById(folder.tree ?? [], id) }))
+      const activeFolderId = state.activeFolderId === id ? 'all' : state.activeFolderId
+      saveFolders(folders, activeFolderId, pinnedFilePaths)
+      return { folders, activeFolderId, pinnedFilePaths }
+    }),
   restoreFile: (rootFolderId, parentId, node) =>
     set((state) => {
       const addToParent = (nodes: FileTreeNode[]): { nodes: FileTreeNode[]; restored: boolean } => {
@@ -458,7 +572,7 @@ export const useRootFolderStore = create<RootFolderState>((set, get) => ({
       const insertAt = position === 'after' ? to + 1 : to
       folders.splice(insertAt, 0, moved)
       const ordered = folders.map((folder, order) => ({ ...folder, order }))
-      saveFolders(ordered, state.activeFolderId)
+      saveFolders(ordered, state.activeFolderId, state.pinnedFilePaths)
       return { folders: ordered }
     }),
 }))

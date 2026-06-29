@@ -54,6 +54,7 @@ export function isRecentlySelfSaved(path: string, windowMs = 2000) {
 const fallbackConfig: AppConfig = {
   rootFolders: mockRootFolders,
   selectedRootFolderId: mockRootFolders[0]?.id,
+  pinnedFilePaths: [],
   layoutDensity: 'comfortable',
   editorTheme: 'paper-white',
   sidebarCollapsed: false,
@@ -197,6 +198,7 @@ export async function loadAppConfig(): Promise<AppConfig> {
   return {
     ...config,
     rootFolders: config.rootFolders ?? [],
+    pinnedFilePaths: config.pinnedFilePaths ?? [],
   }
 }
 
@@ -244,6 +246,20 @@ export async function renamePath(oldPath: string, newName: string): Promise<stri
     return `${parent}/${newName}`
   }
   return invoke<string>('rename_path', { oldPath, newName })
+}
+
+export async function duplicateFile(path: string): Promise<FileTreeNode> {
+  if (!isTauriRuntime()) {
+    const parent = path.slice(0, path.lastIndexOf('/'))
+    const name = path.slice(path.lastIndexOf('/') + 1)
+    const dot = name.lastIndexOf('.')
+    const stem = dot > 0 ? name.slice(0, dot) : name
+    const ext = dot > 0 ? name.slice(dot + 1) : undefined
+    const nextName = ext ? `${stem} 副本.${ext}` : `${stem} 副本`
+    const nextPath = `${parent}/${nextName}`
+    return { id: nextPath, name: nextName, path: nextPath, kind: 'file', extension: ext }
+  }
+  return invoke<FileTreeNode>('duplicate_file', { path })
 }
 
 export async function moveToRecentlyDeleted(path: string, rootPath: string): Promise<DeletedFile> {
