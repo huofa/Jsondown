@@ -44,6 +44,10 @@ export function FileCard({
   onOpen,
   onContextMenu,
 }: FileCardProps) {
+  const clearNativeSelection = () => {
+    window.getSelection()?.removeAllRanges()
+  }
+
   const title = file.name.replace(/\.(md|markdown)$/i, '')
   const summary = file.kind === 'image'
     ? '图片文件'
@@ -56,7 +60,16 @@ export function FileCard({
     <button
       className={`file-card ${selected ? 'is-active' : ''}`}
       onClick={onOpen}
-      onContextMenu={onContextMenu}
+      onMouseDown={(event) => {
+        if (event.button !== 2) return
+        event.preventDefault()
+        clearNativeSelection()
+      }}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        clearNativeSelection()
+        onContextMenu(event)
+      }}
       role="option"
       aria-selected={selected}
     >

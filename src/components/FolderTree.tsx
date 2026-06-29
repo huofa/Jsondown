@@ -76,6 +76,7 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
   const openFolderMenu = (event: MouseEvent, node: FileTreeNode) => {
     event.preventDefault()
     event.stopPropagation()
+    window.getSelection()?.removeAllRanges()
     setMenu({ x: event.clientX, y: event.clientY, node })
   }
 
@@ -87,7 +88,10 @@ export function FolderTree({ nodes, depth = 0, rootFolderId, parentFolderId }: F
           const fileCount = countViewableFiles(node.children ?? [])
           return (
             <div key={node.id}>
-              <div className={`tree-row-shell ${activeFolderId === node.id ? 'is-folder-active' : ''}`}>
+              <div
+                className={`tree-row-shell ${activeFolderId === node.id ? 'is-folder-active' : ''}`}
+                onContextMenu={(event) => openFolderMenu(event, node)}
+              >
                 <button
                   className="tree-row tree-folder-row"
                   style={{ paddingLeft: 10 + depth * 14 }}

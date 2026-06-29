@@ -462,6 +462,22 @@
   background: transparent;
   text-align: left;
   cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.file-card *,
+.tree-row,
+.tree-row *,
+.tree-row-shell,
+.tree-row-shell *,
+.root-folder-row,
+.root-folder-row *,
+.system-folder-row,
+.system-folder-row *,
+.context-menu,
+.context-menu * {
+  -webkit-user-select: none;
+  user-select: none;
 }
 .file-card:hover { background: #f0ede7; }
 .file-card.is-active { background: #e5d8c2; box-shadow: inset 0 0 0 1px rgba(142,106,57,.07); }

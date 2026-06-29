@@ -141,6 +141,8 @@ export function FlatFileListPane() {
 
   const openMenu = (event: MouseEvent, file: EditableFile) => {
     event.preventDefault()
+    event.stopPropagation()
+    window.getSelection()?.removeAllRanges()
     setMenu({ x: event.clientX, y: event.clientY, file })
   }
 
