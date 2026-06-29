@@ -14,6 +14,7 @@
   --jd-list-block-margin-bottom: 0.1em;
   --jd-list-row-margin-top: -0.5em;
   --jd-list-row-margin-bottom: 0.02em;
+  --jd-ordered-list-item-gap: 0.3em;
   --jd-list-task-adjacent-margin-y: -0.18em;
   --crepe-color-on-background: #000000;
   --crepe-color-on-surface: #050505;
@@ -120,6 +121,8 @@
 .milkdown-host .ProseMirror ol { counter-reset: jsondown-ordered-list; }
 .milkdown-host .ProseMirror ol > li {
   counter-increment: jsondown-ordered-list;
+  margin-top: 0;
+  margin-bottom: var(--jd-ordered-list-item-gap);
   padding-left: .82em;
 }
 .milkdown-host .ProseMirror ol > li::before {
@@ -217,6 +220,7 @@
   flex: 1;
   min-width: 0;
   margin-left: 0px !important;
+  padding-bottom: 0.45em !important;
 }
 .milkdown-host .milkdown-list-item-block > .list-item > .children > *:first-child {
   margin-top: 0 !important;
