@@ -73,6 +73,46 @@ const normalizeMarkdownFirstOutput = (markdown: string) => {
   return normalizedLines.join('\n')
 }
 
+const shouldPreserveSoftLineBreak = (line: string) => {
+  const trimmed = line.trim()
+  if (!trimmed) return false
+  if (/^\s*#{1,6}\s+/.test(line)) return false
+  if (/^\s*>/.test(line)) return false
+  if (/^\s*(?:[-*+]\s+|\d+[.)]\s+)/.test(line)) return false
+  if (/^\s*\|.*\|\s*$/.test(line)) return false
+  if (/^\s*(?:---|\*\*\*|___)\s*$/.test(line)) return false
+  if (/\s{2}$/.test(line) || /\\$/.test(line)) return false
+  return true
+}
+
+const normalizeMarkdownForMilkdownStructure = (markdown: string) => {
+  const lines = markdown.replace(/\r\n/g, '\n').split('\n')
+  const normalizedLines: string[] = []
+  let inFence = false
+
+  for (const rawLine of lines) {
+    if (fenceLinePattern.test(rawLine)) {
+      inFence = !inFence
+      normalizedLines.push(rawLine)
+      continue
+    }
+
+    if (inFence) {
+      normalizedLines.push(rawLine)
+      continue
+    }
+
+    const orderedSlashLine = rawLine.replace(/^(\s*)(\d{1,3})\/\s*(\S.*)$/, '$1$2. $3')
+    const nextLine = shouldPreserveSoftLineBreak(orderedSlashLine)
+      ? `${orderedSlashLine}  `
+      : orderedSlashLine
+
+    normalizedLines.push(nextLine)
+  }
+
+  return normalizedLines.join('\n')
+}
+
 const logMarkdownPreview = (markdown: string) => {
   if (!import.meta.env.DEV) return
 
@@ -430,7 +470,7 @@ export function MilkdownEditor({
       })
     const crepe = new Crepe({
       root: rootRef.current,
-      defaultValue: initialValueRef.current,
+      defaultValue: normalizeMarkdownForMilkdownStructure(initialValueRef.current),
       features: {
         [CrepeFeature.AI]: false,
         [CrepeFeature.CodeMirror]: false,
@@ -602,7 +642,16 @@ export function MilkdownEditor({
             break
 
           case 'link':
-            result = commands.call(toggleLinkCommand.key, { href: payload || 'https://' })
+            {
+              const { from, to, empty } = view.state.selection
+              const href = (payload || '').trim() || 'https://'
+              if (empty) {
+                view.dispatch(view.state.tr.insertText(`[链接文字](${href})`, from, to))
+                result = true
+              } else {
+                result = commands.call(toggleLinkCommand.key, { href })
+              }
+            }
             break
 
           case 'image':

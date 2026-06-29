@@ -1,11 +1,12 @@
 import { FileQuestion, FolderOpen, MoreHorizontal, SquarePen } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { MouseEvent as ReactMouseEvent } from 'react'
 import { flushSync } from 'react-dom'
 import { useEditorStore } from '../stores/editorStore'
 import { useOpenedFileCacheStore } from '../stores/openedFileCacheStore'
 import { useRootFolderStore } from '../stores/rootFolderStore'
 import { useThemeStore } from '../stores/themeStore'
-import { backupTextFile, revealInFinder, writeTextFile } from '../services/tauriFileService'
+import { backupTextFile, openExternalUrl, revealInFinder, writeTextFile } from '../services/tauriFileService'
 import type { EditorCommandApi } from '../types/editorCommand'
 import { flattenFiles } from '../utils/flattenFiles'
 import { formatDisplayTime } from '../utils/formatDisplayTime'
@@ -28,6 +29,13 @@ type TextTemplate = {
   id: string
   name: string
   content: string
+}
+
+type EditorContextMenuState = {
+  x: number
+  y: number
+  selectedText: string
+  linkHref?: string
 }
 
 const textTemplateStorageKey = 'jsondown:text-templates'
@@ -101,6 +109,7 @@ export function EditorPane() {
   const [organizeResult, setOrganizeResult] = useState<MarkdownNormalizeResult | null>(null)
   const [organizing, setOrganizing] = useState(false)
   const [editorVisualReadyFileId, setEditorVisualReadyFileId] = useState<string | null>(null)
+  const [editorContextMenu, setEditorContextMenu] = useState<EditorContextMenuState | null>(null)
   const textTemplateMenuRef = useRef<HTMLDivElement>(null)
   const plainTextEditorRef = useRef<PlainTextCodeEditorHandle>(null)
   const saveTimer = useRef<number | undefined>(undefined)
@@ -220,6 +229,19 @@ export function EditorPane() {
       window.removeEventListener('blur', closeOnBlur)
     }
   }, [textTemplateOpen])
+
+  useEffect(() => {
+    if (!editorContextMenu) return
+    const close = () => setEditorContextMenu(null)
+    window.addEventListener('mousedown', close)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('blur', close)
+    return () => {
+      window.removeEventListener('mousedown', close)
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('blur', close)
+    }
+  }, [editorContextMenu])
 
   const createDocument = () => {
     void createMockDocument(activeFolderId).then((id) => {
@@ -417,6 +439,51 @@ export function EditorPane() {
     lastUserScrollIntentAtRef.current = Date.now()
   }
 
+  const findAnchorHref = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return undefined
+    const anchor = target.closest('a[href]') as HTMLAnchorElement | null
+    return anchor?.href
+  }
+
+  const copyToClipboard = async (value: string, message: string) => {
+    if (!value) {
+      showToast('没有可复制的内容')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(value)
+      showToast(message)
+    } catch {
+      showToast('复制失败')
+    }
+  }
+
+  const openLinkInDefaultBrowser = (href: string) => {
+    void openExternalUrl(href)
+      .catch(() => showToast('链接打开失败'))
+  }
+
+  const handleEditorContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (!file) return
+    event.preventDefault()
+    event.stopPropagation()
+    setEditorContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      selectedText: window.getSelection()?.toString() ?? '',
+      linkHref: findAnchorHref(event.target),
+    })
+  }
+
+  const handleEditorClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    const href = findAnchorHref(event.target)
+    if (!href) return
+    if (isEditing && !(event.metaKey || event.ctrlKey)) return
+    event.preventDefault()
+    event.stopPropagation()
+    openLinkInDefaultBrowser(href)
+  }
+
   return (
     <div className={`editor-shell ${theme}`}>
       <header className="editor-header" data-tauri-drag-region onPointerDownCapture={startWindowDrag}>
@@ -525,6 +592,8 @@ export function EditorPane() {
           onWheelCapture={markUserScrollIntent}
           onTouchMoveCapture={markUserScrollIntent}
           onPointerDownCapture={markUserScrollIntent}
+          onContextMenu={handleEditorContextMenu}
+          onClickCapture={handleEditorClick}
         >
           <div className="note-created-time">{formatDisplayTime(file.createdAt ?? file.updatedAt ?? new Date().toISOString())}</div>
           {file.kind === 'image' ? (
@@ -608,6 +677,71 @@ export function EditorPane() {
           onCancel={() => setOrganizeResult(null)}
           onApply={() => void applyMarkdownOrganize()}
         />
+      )}
+      {editorContextMenu && file && (
+        <div
+          className="editor-context-menu"
+          style={{ left: editorContextMenu.x, top: editorContextMenu.y }}
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {editorContextMenu.linkHref && (
+            <>
+              <button
+                onClick={() => {
+                  openLinkInDefaultBrowser(editorContextMenu.linkHref ?? '')
+                  setEditorContextMenu(null)
+                }}
+              >
+                打开链接
+              </button>
+              <button
+                onClick={() => {
+                  void copyToClipboard(editorContextMenu.linkHref ?? '', '已复制链接')
+                  setEditorContextMenu(null)
+                }}
+              >
+                复制链接
+              </button>
+              <span className="editor-context-menu-separator" />
+            </>
+          )}
+          <button
+            disabled={!editorContextMenu.selectedText}
+            onClick={() => {
+              void copyToClipboard(editorContextMenu.selectedText, '已复制选中内容')
+              setEditorContextMenu(null)
+            }}
+          >
+            复制选中内容
+          </button>
+          <button
+            onClick={() => {
+              void copyToClipboard(content, '已复制全文')
+              setEditorContextMenu(null)
+            }}
+          >
+            复制全文
+          </button>
+          <button
+            onClick={() => {
+              void copyToClipboard(file.path, '已复制文件路径')
+              setEditorContextMenu(null)
+            }}
+          >
+            复制文件路径
+          </button>
+          <button
+            onClick={() => {
+              setEditorContextMenu(null)
+              void revealInFinder(file.path)
+                .then(() => showToast('已在访达中显示'))
+                .catch(() => showToast(`阶段 A Mock：在访达中显示 ${file.name}`))
+            }}
+          >
+            在访达中打开
+          </button>
+        </div>
       )}
       <ToastHost />
     </div>

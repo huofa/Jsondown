@@ -51,9 +51,14 @@ const colorPresets = [
 
 export function TopEditorToolbar({ api, disabled }: TopEditorToolbarProps) {
   const [colorOpen, setColorOpen] = useState(false)
+  const [linkOpen, setLinkOpen] = useState(false)
   const [colorMenuPosition, setColorMenuPosition] = useState({ left: 0, top: 0 })
+  const [linkMenuPosition, setLinkMenuPosition] = useState({ left: 0, top: 0 })
+  const [linkUrl, setLinkUrl] = useState('https://')
   const [headingSelectValue, setHeadingSelectValue] = useState('')
   const colorButtonRef = useRef<HTMLButtonElement>(null)
+  const linkButtonRef = useRef<HTMLButtonElement>(null)
+  const linkInputRef = useRef<HTMLInputElement>(null)
   const isDisabled = disabled || !api
   const run = (command: EditorCommand) => api?.run(command)
   const keepSelection = (event: MouseEvent) => {
@@ -82,6 +87,39 @@ export function TopEditorToolbar({ api, disabled }: TopEditorToolbarProps) {
     }
   }, [colorOpen])
 
+  useEffect(() => {
+    if (!linkOpen) return
+
+    const closeLinkMenu = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (linkButtonRef.current?.contains(target)) return
+      if (document.querySelector('.link-menu')?.contains(target)) return
+      setLinkOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setLinkOpen(false)
+    }
+    window.addEventListener('pointerdown', closeLinkMenu, true)
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      window.removeEventListener('pointerdown', closeLinkMenu, true)
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [linkOpen])
+
+  useEffect(() => {
+    if (!linkOpen) return
+    window.requestAnimationFrame(() => linkInputRef.current?.focus())
+  }, [linkOpen])
+
+  const applyLink = () => {
+    const normalized = linkUrl.trim()
+    if (!normalized) return
+    api?.run('link', normalized)
+    setLinkOpen(false)
+  }
+
   const colorMenu = colorOpen
     ? createPortal(
       <div
@@ -103,6 +141,44 @@ export function TopEditorToolbar({ api, disabled }: TopEditorToolbarProps) {
             A
           </button>
         ))}
+      </div>,
+      document.body,
+    )
+    : null
+
+  const linkMenu = linkOpen
+    ? createPortal(
+      <div
+        className="toolbar-floating-menu link-menu"
+        style={{ left: linkMenuPosition.left, top: linkMenuPosition.top }}
+        onMouseDown={(event) => {
+          api?.rememberSelection()
+          event.stopPropagation()
+        }}
+      >
+        <label>
+          <span>链接地址</span>
+          <input
+            ref={linkInputRef}
+            value={linkUrl}
+            placeholder="https://"
+            onChange={(event) => setLinkUrl(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                applyLink()
+              }
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          disabled={!linkUrl.trim()}
+          onMouseDown={keepSelection}
+          onClick={applyLink}
+        >
+          应用链接
+        </button>
       </div>,
       document.body,
     )
@@ -172,12 +248,19 @@ export function TopEditorToolbar({ api, disabled }: TopEditorToolbarProps) {
         <div className="toolbar-group">
           <button
             disabled={isDisabled}
+            ref={linkButtonRef}
             title="链接"
             aria-label="链接"
             onMouseDown={keepSelection}
             onClick={() => {
-              const url = window.prompt('输入链接地址', 'https://')
-              if (url) api?.run('link', url)
+              const rect = linkButtonRef.current?.getBoundingClientRect()
+              if (rect) {
+                setLinkMenuPosition({
+                  left: rect.left,
+                  top: rect.bottom + 6,
+                })
+              }
+              setLinkOpen((open) => !open)
             }}
           >
             <Link size={14} />
@@ -202,6 +285,7 @@ export function TopEditorToolbar({ api, disabled }: TopEditorToolbarProps) {
         </div>
       </div>
       {colorMenu}
+      {linkMenu}
     </div>
   )
 }

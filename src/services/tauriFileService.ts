@@ -71,6 +71,14 @@ export async function selectParentFolder(): Promise<string | null> {
   return invoke<string | null>('select_parent_folder')
 }
 
+export async function openExternalUrl(url: string): Promise<void> {
+  if (!isTauriRuntime()) {
+    window.open(url, '_blank', 'noopener,noreferrer')
+    return
+  }
+  return invoke<void>('open_external_url', { url })
+}
+
 export async function createRootFolder(parentPath: string, folderName: string): Promise<RootFolder> {
   if (!isTauriRuntime()) return createMockFolder(Date.now(), folderName)
   return invoke<RootFolder>('create_root_folder', { parentPath, folderName })
