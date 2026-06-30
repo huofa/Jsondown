@@ -851,6 +851,7 @@ export function EditorPane() {
                       value={content}
                       readOnly={!isEditing}
                       autoFocusStart={pendingEmptyFile?.id === file.id}
+                      searchQuery={documentSearchQuery}
                       onChange={(value) => updateEditorContent(file.id, value)}
                     />
                   </div>

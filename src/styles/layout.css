@@ -576,7 +576,37 @@ body.jsondown-editor-mode-editing .file-card.is-active {
 .plain-text-code-shell {
   min-height: 0;
 }
+.plain-text-code-editor-wrap {
+  position: relative;
+  width: 100%;
+}
+.plain-text-code-highlight-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: transparent;
+  background: transparent;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--custom-editor-font-size);
+  line-height: var(--custom-editor-line-height);
+  letter-spacing: var(--custom-editor-letter-spacing);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  tab-size: 2;
+}
+.plain-text-code-highlight-layer mark {
+  color: transparent;
+  background: rgba(255, 221, 116, .58);
+  border-radius: 2px;
+}
 .plain-text-code-editor {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
   min-height: 1lh;
@@ -1299,6 +1329,40 @@ body.jsondown-editor-mode-editing .file-card.is-active {
   visibility: hidden !important;
   opacity: 0 !important;
   pointer-events: none !important;
+}
+
+/* Plain text / JSON search highlight overlay.
+   This is not a Markdown code block; keep it as a transparent paint layer. */
+.editor-shell .plain-text-code-highlight-layer {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: var(--custom-editor-font-size) !important;
+  line-height: var(--custom-editor-line-height) !important;
+  letter-spacing: var(--custom-editor-letter-spacing) !important;
+  white-space: pre !important;
+  tab-size: 2 !important;
+}
+
+.editor-shell .plain-text-code-highlight-layer::before {
+  display: none !important;
+  content: none !important;
+}
+
+.editor-shell .plain-text-code-highlight-layer mark {
+  color: transparent !important;
+  background: rgba(255, 221, 116, .58) !important;
+  border-radius: 2px !important;
 }
 
 .editor-context-menu {
