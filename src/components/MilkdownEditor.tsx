@@ -85,29 +85,80 @@ const shouldPreserveSoftLineBreak = (line: string) => {
   return true
 }
 
+const isMarkdownStructureLine = (line: string) =>
+  /^\s*#{1,6}\s+/.test(line)
+  || /^\s*>/.test(line)
+  || /^\s*(?:[-*+]\s+|\d+[.)]\s+)/.test(line)
+  || /^\s*\|.*\|\s*$/.test(line)
+  || /^\s*(?:---|\*\*\*|___)\s*$/.test(line)
+
+const isLikelyLooseCodeLine = (line: string) => {
+  const trimmed = line.trim()
+  if (!trimmed || isMarkdownStructureLine(line)) return false
+
+  return /^(?:type|interface|enum|const|let|var|function|class|export|import)\b/.test(trimmed)
+    || /^[A-Za-z_$][\w$]*\??\s*[:=]\s*/.test(trimmed)
+      && /(?:\{|\}|\[|\]|'|"|\||=>|;|,\s*$|\bstring\b|\bnumber\b|\bboolean\b|\bnull\b|\bunknown\b|\barray\b|\bobject\b|\btrue\b|\bfalse\b)/.test(trimmed)
+    || /^[{}\[\]();,]+$/.test(trimmed)
+    || /^[}\])]\s*[,;]?$/.test(trimmed)
+}
+
+const shouldAutoFenceLooseCode = (lines: string[]) => {
+  if (lines.length === 0) return false
+  const joined = lines.join('\n')
+  return lines.length >= 2
+    || /^(?:type|interface|enum|const|let|var|function|class|export|import)\b/.test(lines[0].trim())
+    || /[{}\[\]]/.test(joined)
+}
+
 const normalizeMarkdownForMilkdownStructure = (markdown: string) => {
   const lines = markdown.replace(/\r\n/g, '\n').split('\n')
   const normalizedLines: string[] = []
   let inFence = false
+  let cursor = 0
 
-  for (const rawLine of lines) {
+  while (cursor < lines.length) {
+    const rawLine = lines[cursor]
+
     if (fenceLinePattern.test(rawLine)) {
       inFence = !inFence
       normalizedLines.push(rawLine)
+      cursor += 1
       continue
     }
 
     if (inFence) {
       normalizedLines.push(rawLine)
+      cursor += 1
       continue
     }
 
     const orderedSlashLine = rawLine.replace(/^(\s*)(\d{1,3})\/\s*(\S.*)$/, '$1$2. $3')
+
+    if (isLikelyLooseCodeLine(orderedSlashLine)) {
+      const codeLines: string[] = []
+      let codeCursor = cursor
+
+      while (codeCursor < lines.length) {
+        const candidate = lines[codeCursor].replace(/^(\s*)(\d{1,3})\/\s*(\S.*)$/, '$1$2. $3')
+        if (fenceLinePattern.test(candidate) || !candidate.trim() || !isLikelyLooseCodeLine(candidate)) break
+        codeLines.push(candidate)
+        codeCursor += 1
+      }
+
+      if (shouldAutoFenceLooseCode(codeLines)) {
+        normalizedLines.push('```text', ...codeLines, '```')
+        cursor = codeCursor
+        continue
+      }
+    }
+
     const nextLine = shouldPreserveSoftLineBreak(orderedSlashLine)
       ? `${orderedSlashLine}  `
       : orderedSlashLine
 
     normalizedLines.push(nextLine)
+    cursor += 1
   }
 
   return normalizedLines.join('\n')
