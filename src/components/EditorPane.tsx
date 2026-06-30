@@ -38,6 +38,15 @@ type EditorContextMenuState = {
   linkHref?: string
 }
 
+type WorkspaceSearchOpenDetail = {
+  fileId: string
+  query: string
+  matchText: string
+  firstMatchLine: number
+  firstMatchColumn: number
+  firstMatchByte: number
+}
+
 const textTemplateStorageKey = 'jsondown:text-templates'
 
 const defaultTextTemplates: TextTemplate[] = [
@@ -110,11 +119,17 @@ export function EditorPane() {
   const [organizing, setOrganizing] = useState(false)
   const [editorVisualReadyFileId, setEditorVisualReadyFileId] = useState<string | null>(null)
   const [editorContextMenu, setEditorContextMenu] = useState<EditorContextMenuState | null>(null)
+  const [documentSearchVisible, setDocumentSearchVisible] = useState(false)
+  const [documentSearchQuery, setDocumentSearchQuery] = useState('')
+  const [documentSearchActiveIndex, setDocumentSearchActiveIndex] = useState(0)
+  const [documentSearchCount, setDocumentSearchCount] = useState(0)
   const textTemplateMenuRef = useRef<HTMLDivElement>(null)
+  const documentSearchInputRef = useRef<HTMLInputElement>(null)
   const plainTextEditorRef = useRef<PlainTextCodeEditorHandle>(null)
   const saveTimer = useRef<number | undefined>(undefined)
   const editorScrollRef = useRef<HTMLDivElement>(null)
   const pendingEditAnchorRef = useRef<ReadonlyEditAnchor | null>(null)
+  const pendingWorkspaceSearchRef = useRef<WorkspaceSearchOpenDetail | null>(null)
   const previousActiveFileIdRef = useRef<string | null>(null)
   const lastUserScrollIntentAtRef = useRef(0)
 
@@ -242,6 +257,135 @@ export function EditorPane() {
       window.removeEventListener('blur', close)
     }
   }, [editorContextMenu])
+
+  const clearSearchHighlights = () => {
+    const css = globalThis.CSS as unknown as { highlights?: { delete: (name: string) => void } } | undefined
+    css?.highlights?.delete('jsondown-search')
+    css?.highlights?.delete('jsondown-search-current')
+  }
+
+  const getSearchRoot = () =>
+    editorScrollRef.current?.querySelector('.paper') as HTMLElement | null
+
+  const collectSearchRanges = (query: string) => {
+    const root = getSearchRoot()
+    const value = query.trim()
+    if (!root || !value) return []
+    const ranges: Range[] = []
+    const lowerValue = value.toLocaleLowerCase()
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const parent = node.parentElement
+        if (!parent) return NodeFilter.FILTER_REJECT
+        if (parent.closest('button, input, textarea, select, .editor-context-menu, .document-search-popover')) {
+          return NodeFilter.FILTER_REJECT
+        }
+        return node.textContent?.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+      },
+    })
+
+    let node = walker.nextNode()
+    while (node) {
+      const text = node.textContent ?? ''
+      const lowerText = text.toLocaleLowerCase()
+      let from = 0
+      while (from <= lowerText.length) {
+        const index = lowerText.indexOf(lowerValue, from)
+        if (index < 0) break
+        const range = document.createRange()
+        range.setStart(node, index)
+        range.setEnd(node, index + value.length)
+        ranges.push(range)
+        from = index + Math.max(value.length, 1)
+      }
+      node = walker.nextNode()
+    }
+    return ranges
+  }
+
+  const applySearchHighlights = (ranges: Range[], activeIndex: number) => {
+    clearSearchHighlights()
+    const highlightCtor = (globalThis as unknown as { Highlight?: new (...ranges: Range[]) => unknown }).Highlight
+    const css = globalThis.CSS as unknown as { highlights?: { set: (name: string, highlight: unknown) => void } } | undefined
+    if (!highlightCtor || !css?.highlights || ranges.length === 0) return
+    css.highlights.set('jsondown-search', new highlightCtor(...ranges))
+    const current = ranges[activeIndex]
+    if (current) css.highlights.set('jsondown-search-current', new highlightCtor(current))
+  }
+
+  const scrollRangeIntoView = (range?: Range) => {
+    const scroll = editorScrollRef.current
+    if (!scroll || !range) return
+    const rect = range.getBoundingClientRect()
+    const scrollRect = scroll.getBoundingClientRect()
+    if (!rect.height && !rect.width) return
+    const targetTop = scroll.scrollTop + rect.top - scrollRect.top - scrollRect.height * 0.35
+    scroll.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' })
+  }
+
+  const refreshDocumentSearch = (query: string, requestedIndex = documentSearchActiveIndex, shouldScroll = true) => {
+    const ranges = collectSearchRanges(query)
+    const nextCount = ranges.length
+    const nextIndex = nextCount ? ((requestedIndex % nextCount) + nextCount) % nextCount : 0
+    setDocumentSearchCount(nextCount)
+    setDocumentSearchActiveIndex(nextIndex)
+    applySearchHighlights(ranges, nextIndex)
+    if (shouldScroll) scrollRangeIntoView(ranges[nextIndex])
+  }
+
+  useEffect(() => {
+    const openSearch = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'f') return
+      if (!file) return
+      event.preventDefault()
+      event.stopPropagation()
+      setDocumentSearchVisible(true)
+      window.setTimeout(() => {
+        documentSearchInputRef.current?.focus()
+        documentSearchInputRef.current?.select()
+      }, 0)
+    }
+    window.addEventListener('keydown', openSearch, true)
+    return () => window.removeEventListener('keydown', openSearch, true)
+  }, [file])
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<WorkspaceSearchOpenDetail>).detail
+      if (!detail) return
+      pendingWorkspaceSearchRef.current = detail
+      setDocumentSearchQuery(detail.query)
+      setDocumentSearchVisible(false)
+      setDocumentSearchActiveIndex(0)
+    }
+    window.addEventListener('jsondown:workspace-search-open', handler)
+    return () => window.removeEventListener('jsondown:workspace-search-open', handler)
+  }, [])
+
+  useEffect(() => {
+    if (!file) {
+      clearSearchHighlights()
+      setDocumentSearchVisible(false)
+      setDocumentSearchQuery('')
+      setDocumentSearchCount(0)
+      return
+    }
+    const pending = pendingWorkspaceSearchRef.current
+    if (!pending || pending.fileId !== file.id || !fullContentLoaded) return
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        refreshDocumentSearch(pending.query, 0, true)
+        pendingWorkspaceSearchRef.current = null
+      })
+    })
+  }, [file?.id, fullContentLoaded, content, editorVisualReady])
+
+  useEffect(() => {
+    if (!documentSearchVisible) return
+    window.requestAnimationFrame(() => refreshDocumentSearch(documentSearchQuery, documentSearchActiveIndex, false))
+  }, [content, documentSearchQuery, documentSearchVisible, editorVisualReady, fullContentLoaded])
+
+  useEffect(() => () => clearSearchHighlights(), [])
 
   const createDocument = () => {
     void createMockDocument(activeFolderId).then((id) => {
@@ -568,7 +712,7 @@ export function EditorPane() {
             title="在访达中打开（Mock）"
             aria-label="在访达中打开"
             disabled={!file}
-            onClick={() => file && void revealInFinder(file.path)
+          onClick={() => file && void revealInFinder(file.path)
               .then(() => showToast('已在访达中显示'))
               .catch(() => showToast(`阶段 A Mock：在访达中显示 ${file.name}`))}
           >
@@ -577,6 +721,61 @@ export function EditorPane() {
           <button className="icon-button" title="更多" aria-label="更多"><MoreHorizontal size={16} /></button>
         </div>
       </header>
+
+      {file && documentSearchVisible && (
+        <div
+          className="document-search-popover"
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <input
+            ref={documentSearchInputRef}
+            value={documentSearchQuery}
+            placeholder="查找"
+            onChange={(event) => {
+              const value = event.currentTarget.value
+              setDocumentSearchQuery(value)
+              refreshDocumentSearch(value, 0, true)
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                setDocumentSearchVisible(false)
+                clearSearchHighlights()
+                return
+              }
+              if (event.key === 'Enter') {
+                const next = event.shiftKey ? documentSearchActiveIndex - 1 : documentSearchActiveIndex + 1
+                refreshDocumentSearch(documentSearchQuery, next, true)
+              }
+            }}
+          />
+          <span className="document-search-count">
+            {documentSearchQuery.trim() ? `${documentSearchCount ? documentSearchActiveIndex + 1 : 0}/${documentSearchCount}` : '0/0'}
+          </span>
+          <button
+            aria-label="上一个"
+            disabled={!documentSearchCount}
+            onClick={() => refreshDocumentSearch(documentSearchQuery, documentSearchActiveIndex - 1, true)}
+          >
+            ‹
+          </button>
+          <button
+            aria-label="下一个"
+            disabled={!documentSearchCount}
+            onClick={() => refreshDocumentSearch(documentSearchQuery, documentSearchActiveIndex + 1, true)}
+          >
+            ›
+          </button>
+          <button
+            onClick={() => {
+              setDocumentSearchVisible(false)
+              clearSearchHighlights()
+            }}
+          >
+            完成
+          </button>
+        </div>
+      )}
 
       {!file ? (
         <div className="editor-empty">

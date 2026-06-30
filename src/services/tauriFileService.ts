@@ -31,6 +31,20 @@ export type FileChunkResult = {
   sizeBytes: number
 }
 
+export type WorkspaceSearchResult = {
+  path: string
+  name: string
+  parentPath: string
+  extension: string
+  matchType: 'exact' | 'all_tokens'
+  matchCount: number
+  firstMatchLine: number
+  firstMatchColumn: number
+  firstMatchByte: number
+  snippet: string
+  updatedAt?: string
+}
+
 export type FileWatchPayload = {
   eventType: 'file-created' | 'file-updated' | 'file-deleted' | 'file-renamed'
   paths: string[]
@@ -169,6 +183,75 @@ export async function readFileChunk(
     }
   }
   return invoke<FileChunkResult>('read_file_chunk', { path, startByte, maxBytes })
+}
+
+function buildSearchTokens(query: string) {
+  const value = query.trim().toLocaleLowerCase()
+  if (!value) return []
+  const spaced = value.split(/\s+/).filter(Boolean)
+  if (spaced.length > 1) return spaced
+  if (/^[\w.-]+$/i.test(value)) return [value]
+  return Array.from(value)
+}
+
+function getLineColumn(content: string, index: number) {
+  const before = content.slice(0, index)
+  const lines = before.split('\n')
+  return {
+    line: lines.length,
+    column: (lines.at(-1)?.length ?? 0) + 1,
+  }
+}
+
+function getSearchSnippet(content: string, index: number, queryLength: number) {
+  const start = content.lastIndexOf('\n', Math.max(0, index - 1)) + 1
+  const nextLine = content.indexOf('\n', index)
+  const end = nextLine >= 0 ? nextLine : content.length
+  const line = content.slice(start, end).trim()
+  if (line.length <= 120) return line
+  return content
+    .slice(Math.max(start, index - 42), Math.min(end, index + queryLength + 72))
+    .trim()
+}
+
+export async function searchWorkspace(filePaths: string[], query: string): Promise<WorkspaceSearchResult[]> {
+  const value = query.trim()
+  if (!value) return []
+
+  if (!isTauriRuntime()) {
+    const lowerQuery = value.toLocaleLowerCase()
+    const tokens = buildSearchTokens(value)
+    return filePaths.flatMap((path) => {
+      const content = mockFileContents[path] ?? ''
+      const lowerContent = content.toLocaleLowerCase()
+      const exactIndex = lowerContent.indexOf(lowerQuery)
+      const exact = exactIndex >= 0
+      const allTokens = !exact && tokens.length > 1 && tokens.every((token) => lowerContent.includes(token))
+      if (!exact && !allTokens) return []
+      const firstIndex = exact
+        ? exactIndex
+        : Math.min(...tokens.map((token) => lowerContent.indexOf(token)).filter((index) => index >= 0))
+      const { line, column } = getLineColumn(content, firstIndex)
+      const name = path.split('/').pop() ?? path
+      const extension = name.includes('.') ? name.split('.').pop()!.toLowerCase() : ''
+      return [{
+        path,
+        name,
+        parentPath: path.slice(0, path.lastIndexOf('/')),
+        extension,
+        matchType: exact ? 'exact' as const : 'all_tokens' as const,
+        matchCount: exact
+          ? lowerContent.split(lowerQuery).length - 1
+          : Math.min(...tokens.map((token) => lowerContent.split(token).length - 1)),
+        firstMatchLine: line,
+        firstMatchColumn: column,
+        firstMatchByte: firstIndex,
+        snippet: getSearchSnippet(content, firstIndex, value.length),
+      }]
+    })
+  }
+
+  return invoke<WorkspaceSearchResult[]>('search_workspace', { filePaths, query: value })
 }
 
 export async function writeTextFile(path: string, content: string): Promise<SaveResult> {

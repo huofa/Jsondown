@@ -40,6 +40,22 @@ pub struct FileChunkResult {
     pub size_bytes: u64,
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceSearchResult {
+    pub path: String,
+    pub name: String,
+    pub parent_path: String,
+    pub extension: String,
+    pub match_type: String,
+    pub match_count: usize,
+    pub first_match_line: usize,
+    pub first_match_column: usize,
+    pub first_match_byte: usize,
+    pub snippet: String,
+    pub updated_at: Option<String>,
+}
+
 fn file_node_from_path(path: &Path) -> FileTreeNode {
     let (created_at, updated_at, size) = metadata_times(path);
     FileTreeNode {
@@ -243,6 +259,94 @@ fn build_preview(path: &Path, content: &str, max_lines: usize) -> (String, Strin
     (title, summary)
 }
 
+fn search_tokens(query: &str) -> Vec<String> {
+    let trimmed = query.trim().to_lowercase();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+
+    let spaced: Vec<String> = trimmed
+        .split_whitespace()
+        .filter(|token| !token.is_empty())
+        .map(|token| token.to_string())
+        .collect();
+    if spaced.len() > 1 {
+        return spaced;
+    }
+
+    if trimmed.is_ascii() {
+        return vec![trimmed];
+    }
+
+    trimmed.chars().map(|ch| ch.to_string()).collect()
+}
+
+fn line_column_for_byte(content: &str, byte_index: usize) -> (usize, usize) {
+    let mut line = 1;
+    let mut column = 1;
+    for (index, ch) in content.char_indices() {
+        if index >= byte_index {
+            break;
+        }
+        if ch == '\n' {
+            line += 1;
+            column = 1;
+        } else {
+            column += 1;
+        }
+    }
+    (line, column)
+}
+
+fn snippet_for_match(content: &str, byte_index: usize, query_len: usize) -> String {
+    let start = content[..byte_index.min(content.len())]
+        .rfind('\n')
+        .map(|index| index + 1)
+        .unwrap_or(0);
+    let end = content[byte_index.min(content.len())..]
+        .find('\n')
+        .map(|index| byte_index + index)
+        .unwrap_or(content.len());
+    let line = content[start..end].trim();
+    if line.chars().count() <= 120 {
+        return line.to_string();
+    }
+
+    let query_chars = content[byte_index..(byte_index + query_len).min(content.len())]
+        .chars()
+        .count();
+    let before: String = content[start..byte_index]
+        .chars()
+        .rev()
+        .take(42)
+        .collect::<String>()
+        .chars()
+        .rev()
+        .collect();
+    let matched: String = content[byte_index..(byte_index + query_len).min(content.len())]
+        .chars()
+        .take(query_chars)
+        .collect();
+    let after: String = content[(byte_index + query_len).min(content.len())..end]
+        .chars()
+        .take(72)
+        .collect();
+    format!("{}{}{}", before, matched, after).trim().to_string()
+}
+
+fn find_case_insensitive_byte(content: &str, query: &str) -> Option<usize> {
+    content.find(query).or_else(|| {
+        let lower_content = content.to_lowercase();
+        let lower_query = query.to_lowercase();
+        lower_content.find(&lower_query).and_then(|lower_byte| {
+            content
+                .char_indices()
+                .map(|(index, _)| index)
+                .find(|index| content[..*index].to_lowercase().len() >= lower_byte)
+        })
+    })
+}
+
 #[tauri::command]
 pub fn read_text_file(path: String) -> Result<String, String> {
     let path = Path::new(&path);
@@ -294,6 +398,90 @@ pub fn read_file_preview(
         created_at,
         updated_at,
     })
+}
+
+#[tauri::command]
+pub fn search_workspace(file_paths: Vec<String>, query: String) -> Result<Vec<WorkspaceSearchResult>, String> {
+    let query = query.trim().to_string();
+    if query.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let lower_query = query.to_lowercase();
+    let tokens = search_tokens(&query);
+    let mut results = Vec::new();
+
+    for path in file_paths {
+        let path_ref = Path::new(&path);
+        if has_ignored_component(path_ref) || !is_supported_text_file(path_ref) {
+            continue;
+        }
+
+        let metadata = match fs::metadata(path_ref) {
+            Ok(metadata) => metadata,
+            Err(_) => continue,
+        };
+        if !metadata.is_file() || metadata.len() > 5 * 1024 * 1024 {
+            continue;
+        }
+
+        let content = match fs::read_to_string(path_ref) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        let lower_content = content.to_lowercase();
+        let exact = lower_content.contains(&lower_query);
+        let all_tokens = !exact
+            && tokens.len() > 1
+            && tokens.iter().all(|token| lower_content.contains(token));
+
+        if !exact && !all_tokens {
+            continue;
+        }
+
+        let match_type = if exact { "exact" } else { "all_tokens" }.to_string();
+        let first_match_byte = if exact {
+            find_case_insensitive_byte(&content, &query).unwrap_or(0)
+        } else {
+            tokens
+                .iter()
+                .filter_map(|token| find_case_insensitive_byte(&content, token))
+                .min()
+                .unwrap_or(0)
+        };
+        let match_count = if exact {
+            lower_content.matches(&lower_query).count().max(1)
+        } else {
+            tokens
+                .iter()
+                .map(|token| lower_content.matches(token).count())
+                .min()
+                .unwrap_or(1)
+                .max(1)
+        };
+        let (first_match_line, first_match_column) = line_column_for_byte(&content, first_match_byte);
+        let (_, updated_at, _) = metadata_times(path_ref);
+        let parent_path = path_ref
+            .parent()
+            .map(path_to_string)
+            .unwrap_or_default();
+
+        results.push(WorkspaceSearchResult {
+            path: path.clone(),
+            name: path_file_name(path_ref),
+            parent_path,
+            extension: extension(path_ref).unwrap_or_default(),
+            match_type,
+            match_count,
+            first_match_line,
+            first_match_column,
+            first_match_byte,
+            snippet: snippet_for_match(&content, first_match_byte, query.len()),
+            updated_at,
+        });
+    }
+
+    Ok(results)
 }
 
 #[tauri::command]

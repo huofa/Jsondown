@@ -7,7 +7,8 @@ use commands::{
     files::{
         backup_text_file, create_file, create_unique_markdown_file, delete_empty_file_if_exists,
         duplicate_file,
-        read_file_preview, read_file_chunk, read_text_file, rename_path, write_text_file,
+        read_file_preview, read_file_chunk, read_text_file, rename_path, search_workspace,
+        write_text_file,
     },
     finder::{open_external_url, reveal_in_finder},
     folders::{
@@ -32,6 +33,7 @@ pub fn run() {
             read_file_preview,
             read_file_chunk,
             read_text_file,
+            search_workspace,
             write_text_file,
             backup_text_file,
             reveal_in_finder,
