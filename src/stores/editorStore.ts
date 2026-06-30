@@ -7,6 +7,7 @@ import {
   writeTextFile,
 } from '../services/tauriFileService'
 import { useFilePreviewStore } from './filePreviewStore'
+import { useFullFileCacheStore } from './fullFileCacheStore'
 import { useOpenedFileCacheStore } from './openedFileCacheStore'
 import type { EditableFile } from '../types/file'
 import { mockFileContents } from '../utils/mockFileSystem'
@@ -37,6 +38,7 @@ type EditorState = {
   saveFileContent: (id: string, path: string) => Promise<boolean>
   updateContent: (id: string, content: string) => void
   addContent: (id: string, content: string) => void
+  hydrateContentAsSaved: (id: string, path: string, content: string) => void
   replaceContentAsSaved: (id: string, path: string, content: string, savedAt?: string) => void
   removeContent: (id: string) => void
   setSaveStatus: (status: SaveStatus) => void
@@ -155,7 +157,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
     if (get().loadedPaths[id] === path && get().contents[id] !== undefined) return
     try {
-      const content = await readTextFile(path, id)
+      const cachedEntry = Object.values(useFullFileCacheStore.getState().entries)
+        .find((entry) => entry.path === path && entry.content !== undefined && !entry.error)
+      const content = cachedEntry?.content ?? await readTextFile(path, id)
+      if (!cachedEntry) {
+        useFullFileCacheStore.getState().upsertContent({ path }, content)
+      }
       set((state) => ({
         contents: { ...state.contents, [id]: content },
         savedContents: { ...state.savedContents, [id]: content },
@@ -167,6 +174,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
   reloadFileContent: async (id, path, kind) => {
+    useFullFileCacheStore.getState().invalidatePath(path)
     set((state) => {
       const contents = { ...state.contents }
       const loadedPaths = { ...state.loadedPaths }
@@ -203,6 +211,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         savedContents: result.ok ? { ...state.savedContents, [id]: content } : state.savedContents,
       }))
       if (result.ok) {
+        useFullFileCacheStore.getState().upsertContent({ path, updatedAt: result.updatedAt ?? result.savedAt, size: content.length }, content)
         useOpenedFileCacheStore.getState().invalidatePath(path)
         useFilePreviewStore.getState().removePreview(path)
         window.dispatchEvent(new CustomEvent('jsondown:file-saved', {
@@ -232,6 +241,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   addContent: (id, content) =>
     set((state) => ({ contents: { ...state.contents, [id]: content } })),
+  hydrateContentAsSaved: (id, path, content) =>
+    set((state) => ({
+      contents: { ...state.contents, [id]: content },
+      savedContents: { ...state.savedContents, [id]: content },
+      loadedPaths: { ...state.loadedPaths, [id]: path },
+      saveStatus: state.activeFileId === id && state.saveStatus !== 'dirty' ? 'idle' : state.saveStatus,
+    })),
   replaceContentAsSaved: (id, path, content, savedAt = new Date().toISOString()) => {
     set((state) => ({
       contents: { ...state.contents, [id]: content },
@@ -241,6 +257,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       savedAt: state.activeFileId === id ? savedAt : state.savedAt,
     }))
     useOpenedFileCacheStore.getState().invalidatePath(path)
+    useFullFileCacheStore.getState().upsertContent({ path, updatedAt: savedAt, size: content.length }, content)
     useFilePreviewStore.getState().removePreview(path)
     window.dispatchEvent(new CustomEvent('jsondown:file-saved', {
       detail: { path, updatedAt: savedAt, size: content.length },

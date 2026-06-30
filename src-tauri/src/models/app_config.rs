@@ -14,4 +14,5 @@ pub struct AppConfig {
     pub custom_editor_layout: Option<serde_json::Value>,
     pub editor_theme: Option<String>,
     pub sidebar_collapsed: Option<bool>,
+    pub last_workspace_state: Option<serde_json::Value>,
 }
