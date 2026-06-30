@@ -10,13 +10,42 @@ type PlainTextCodeEditorProps = {
   value: string
   readOnly?: boolean
   autoFocusStart?: boolean
+  searchQuery?: string
   onChange: (value: string) => void
 }
 
+const buildHighlightParts = (value: string, query: string) => {
+  const normalizedQuery = query.trim()
+  if (!normalizedQuery) return [{ text: value, highlighted: false }]
+
+  const lowerValue = value.toLocaleLowerCase()
+  const lowerQuery = normalizedQuery.toLocaleLowerCase()
+  const parts: Array<{ text: string; highlighted: boolean }> = []
+  let cursor = 0
+
+  while (cursor < value.length) {
+    const index = lowerValue.indexOf(lowerQuery, cursor)
+    if (index < 0) break
+    if (index > cursor) {
+      parts.push({ text: value.slice(cursor, index), highlighted: false })
+    }
+    parts.push({ text: value.slice(index, index + normalizedQuery.length), highlighted: true })
+    cursor = index + Math.max(normalizedQuery.length, 1)
+  }
+
+  if (cursor < value.length) {
+    parts.push({ text: value.slice(cursor), highlighted: false })
+  }
+
+  return parts.length ? parts : [{ text: value, highlighted: false }]
+}
+
 export const PlainTextCodeEditor = forwardRef<PlainTextCodeEditorHandle, PlainTextCodeEditorProps>(
-  function PlainTextCodeEditor({ value, readOnly = false, autoFocusStart = false, onChange }, ref) {
+  function PlainTextCodeEditor({ value, readOnly = false, autoFocusStart = false, searchQuery = '', onChange }, ref) {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
+    const highlightLayerRef = useRef<HTMLPreElement>(null)
     const selectionRef = useRef<{ start: number; end: number } | null>(null)
+    const highlightParts = buildHighlightParts(value, searchQuery)
 
     const resizeToContent = () => {
       const textarea = textareaRef.current
@@ -39,6 +68,8 @@ export const PlainTextCodeEditor = forwardRef<PlainTextCodeEditorHandle, PlainTe
     const rememberSelection = () => {
       const textarea = textareaRef.current
       if (!textarea) return false
+      const highlightLayer = highlightLayerRef.current
+      if (highlightLayer) highlightLayer.scrollTop = textarea.scrollTop
       textarea.scrollTop = 0
       selectionRef.current = {
         start: textarea.selectionStart,
@@ -94,22 +125,38 @@ export const PlainTextCodeEditor = forwardRef<PlainTextCodeEditorHandle, PlainTe
     }, [value])
 
     return (
-      <textarea
-        ref={textareaRef}
-        className="plain-text-code-editor"
-        rows={1}
-        value={value}
-        readOnly={readOnly}
-        spellCheck={false}
-        onBlur={rememberSelection}
-        onKeyUp={rememberSelection}
-        onMouseUp={rememberSelection}
-        onSelect={rememberSelection}
-        onChange={(event) => {
-          onChange(event.currentTarget.value)
-          window.requestAnimationFrame(resizeToContent)
-        }}
-      />
+      <div className="plain-text-code-editor-wrap">
+        <pre ref={highlightLayerRef} aria-hidden="true" className="plain-text-code-highlight-layer">
+          {highlightParts.map((part, index) =>
+            part.highlighted ? (
+              <mark key={index}>{part.text}</mark>
+            ) : (
+              <span key={index}>{part.text}</span>
+            ),
+          )}
+          {'\n'}
+        </pre>
+        <textarea
+          ref={textareaRef}
+          className="plain-text-code-editor"
+          rows={1}
+          value={value}
+          readOnly={readOnly}
+          spellCheck={false}
+          onBlur={rememberSelection}
+          onKeyUp={rememberSelection}
+          onMouseUp={rememberSelection}
+          onSelect={rememberSelection}
+          onScroll={(event) => {
+            const highlightLayer = highlightLayerRef.current
+            if (highlightLayer) highlightLayer.scrollTop = event.currentTarget.scrollTop
+          }}
+          onChange={(event) => {
+            onChange(event.currentTarget.value)
+            window.requestAnimationFrame(resizeToContent)
+          }}
+        />
+      </div>
     )
   },
 )
