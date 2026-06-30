@@ -7,6 +7,7 @@ import { useEditorStore } from './stores/editorStore'
 import { useRecentlyDeletedStore } from './stores/recentlyDeletedStore'
 import { useRootFolderStore } from './stores/rootFolderStore'
 import { useSettingsStore } from './stores/settingsStore'
+import { useWorkspaceStateStore } from './stores/workspaceStateStore'
 import { isRecentlySelfSaved, watchPaths } from './services/tauriFileService'
 import { flattenFiles } from './utils/flattenFiles'
 import { getDirectFilesForSelection } from './utils/folderSelection'
@@ -25,7 +26,11 @@ export default function App() {
   const customEditorLayout = useSettingsStore((state) => state.customEditorLayout)
   const initializeSettings = useSettingsStore((state) => state.initializeSettings)
   const loadRecentlyDeleted = useRecentlyDeletedStore((state) => state.loadRecentlyDeleted)
+  const initializeWorkspaceState = useWorkspaceStateStore((state) => state.initializeWorkspaceState)
+  const lastWorkspaceState = useWorkspaceStateStore((state) => state.lastWorkspaceState)
+  const workspaceStateInitialized = useWorkspaceStateStore((state) => state.initialized)
   const watcherRefreshTimer = useRef<number | undefined>(undefined)
+  const sessionRestoreAttemptedRef = useRef(false)
   const foldersRef = useRef(folders)
   const activeFileIdRef = useRef(activeFileId)
   foldersRef.current = folders
@@ -39,6 +44,10 @@ export default function App() {
   useEffect(() => {
     void initializeSettings()
   }, [initializeSettings])
+
+  useEffect(() => {
+    void initializeWorkspaceState()
+  }, [initializeWorkspaceState])
 
   useEffect(() => {
     const refreshAfterPendingDelete = (event: Event) => {
@@ -80,15 +89,30 @@ export default function App() {
       closeFile()
       return
     }
+    if (!workspaceStateInitialized) return
+
     const files = activeFolderId === 'all'
       ? folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id))
       : getDirectFilesForSelection(folders, activeFolderId)
     if (!files.some((file) => file.id === activeFileId)) {
-      const firstMarkdown = files.find((file) => file.editable) ?? files[0]
-      if (firstMarkdown) void requestOpenFile(firstMarkdown.id, folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id)))
+      const allFiles = folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id))
+      const restoreFile = !sessionRestoreAttemptedRef.current && lastWorkspaceState?.selectedFilePath
+        ? allFiles.find((file) => file.path === lastWorkspaceState.selectedFilePath)
+        : undefined
+      sessionRestoreAttemptedRef.current = true
+      const firstMarkdown = restoreFile ?? files.find((file) => file.editable) ?? files[0]
+      if (firstMarkdown) void requestOpenFile(firstMarkdown.id, allFiles)
       else closeFile()
     }
-  }, [activeFileId, activeFolderId, closeFile, folders, requestOpenFile])
+  }, [
+    activeFileId,
+    activeFolderId,
+    closeFile,
+    folders,
+    lastWorkspaceState?.selectedFilePath,
+    requestOpenFile,
+    workspaceStateInitialized,
+  ])
 
   return (
     <div

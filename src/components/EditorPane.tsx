@@ -3,9 +3,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import { flushSync } from 'react-dom'
 import { useEditorStore } from '../stores/editorStore'
+import { useFullFileCacheStore } from '../stores/fullFileCacheStore'
 import { useOpenedFileCacheStore } from '../stores/openedFileCacheStore'
 import { useRootFolderStore } from '../stores/rootFolderStore'
 import { useThemeStore } from '../stores/themeStore'
+import { useWorkspaceStateStore } from '../stores/workspaceStateStore'
 import { backupTextFile, openExternalUrl, revealInFinder, writeTextFile } from '../services/tauriFileService'
 import type { EditorCommandApi } from '../types/editorCommand'
 import { flattenFiles } from '../utils/flattenFiles'
@@ -106,6 +108,11 @@ export function EditorPane() {
   const loadNextReadonlyChunk = useOpenedFileCacheStore((state) => state.loadNextReadonlyChunk)
   const updateReadonlyScrollTop = useOpenedFileCacheStore((state) => state.updateScrollTop)
   const getReadonlyKey = useOpenedFileCacheStore((state) => state.getCacheKey)
+  const fullFileEntries = useFullFileCacheStore((state) => state.entries)
+  const ensureFullFileLoaded = useFullFileCacheStore((state) => state.ensureFullFileLoaded)
+  const updateFullFileScrollTop = useFullFileCacheStore((state) => state.updateScrollTop)
+  const lastWorkspaceState = useWorkspaceStateStore((state) => state.lastWorkspaceState)
+  const scheduleSaveLastWorkspaceState = useWorkspaceStateStore((state) => state.scheduleSaveLastWorkspaceState)
   const theme = useThemeStore((state) => state.theme)
   const [editorApi, setEditorApi] = useState<EditorCommandApi | null>(null)
   const [editingFileId, setEditingFileId] = useState<string | null>(null)
@@ -132,6 +139,7 @@ export function EditorPane() {
   const pendingWorkspaceSearchRef = useRef<WorkspaceSearchOpenDetail | null>(null)
   const previousActiveFileIdRef = useRef<string | null>(null)
   const lastUserScrollIntentAtRef = useRef(0)
+  const sessionRestoreAppliedPathRef = useRef<string | null>(null)
 
   const allFiles = useMemo(
     () => folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id)),
@@ -142,10 +150,34 @@ export function EditorPane() {
   const fullContentLoaded = Boolean(file && loadedPaths[file.id] === file.path && contents[file.id] !== undefined)
   const isNewFileLocked = Boolean(pendingEmptyFile && !(contents[pendingEmptyFile.id] ?? '').trim())
   const readonlyEntry = file ? readonlyEntries[getReadonlyKey(file)] : undefined
+  const fullFileEntry = file ? fullFileEntries[file.path] : undefined
   const isEditing = Boolean(file?.editable && editingFileId === file.id)
   const editorVisualReady = Boolean(file?.editable && editorVisualReadyFileId === file.id)
   const isMarkdownFile = Boolean(file && MARKDOWN_EXTENSIONS.has(file.extension.toLowerCase()))
   const isTextCodeFile = Boolean(file && CODE_TEXT_EXTENSIONS.has(file.extension.toLowerCase()))
+
+  const getRestoreOpenOptions = () => {
+    if (!file || lastWorkspaceState?.selectedFilePath !== file.path) return undefined
+    if (sessionRestoreAppliedPathRef.current === file.path) return undefined
+    const sizeBytes = file.size ?? 0
+    if (sizeBytes <= 0) return { scrollTop: lastWorkspaceState.rightEditorScrollTop ?? 0 }
+    const scrollableHeight = Math.max(
+      0,
+      (lastWorkspaceState.rightEditorScrollHeight ?? 0) - (lastWorkspaceState.rightEditorClientHeight ?? 0),
+    )
+    const ratio = scrollableHeight > 0
+      ? Math.max(0, Math.min(1, (lastWorkspaceState.rightEditorScrollTop ?? 0) / scrollableHeight))
+      : 0
+    const screenBytes = 16 * 1024
+    const beforeBytes = screenBytes * 4
+    const afterBytes = screenBytes * 4
+    return {
+      startByte: Math.max(0, Math.floor(sizeBytes * ratio) - beforeBytes),
+      maxBytes: beforeBytes + afterBytes,
+      scrollTop: lastWorkspaceState.rightEditorScrollTop ?? 0,
+      force: true,
+    }
+  }
 
   useEffect(() => {
     if (!file) return
@@ -158,15 +190,29 @@ export function EditorPane() {
       void loadFileContent(file.id, file.path, file.kind)
       return
     }
-    if (file.editable && (isMarkdownFile || isTextCodeFile)) {
+    if (file.editable && isMarkdownFile) {
+      const restoreOptions = getRestoreOpenOptions()
+      if (restoreOptions?.force) sessionRestoreAppliedPathRef.current = file.path
+      void openReadonlyFile(file, restoreOptions)
+      return
+    }
+    if (file.editable && isTextCodeFile) {
       void loadFileContent(file.id, file.path, file.kind)
       return
     }
-    void openReadonlyFile(file)
+    const restoreOptions = getRestoreOpenOptions()
+    if (restoreOptions?.force) sessionRestoreAppliedPathRef.current = file.path
+    void openReadonlyFile(file, restoreOptions)
   }, [file, isMarkdownFile, isTextCodeFile, loadFileContent, openReadonlyFile, pendingEmptyFile?.id])
 
   useEffect(() => {
-    if (!file || file.editable || isEditing || !readonlyEntry) return
+    if (!file || !file.editable || !isMarkdownFile || !fullFileEntry?.content) return
+    if (loadedPaths[file.id] === file.path && contents[file.id] !== undefined) return
+    useEditorStore.getState().hydrateContentAsSaved(file.id, file.path, fullFileEntry.content)
+  }, [contents, file, fullFileEntry?.content, isMarkdownFile, loadedPaths])
+
+  useEffect(() => {
+    if (!file || isEditing || !readonlyEntry) return
     const scroll = editorScrollRef.current
     if (!scroll) return
     window.requestAnimationFrame(() => {
@@ -225,6 +271,20 @@ export function EditorPane() {
   useEffect(() => () => {
     window.clearTimeout(saveTimer.current)
   }, [])
+
+  useEffect(() => {
+    if (!file) return
+    const scroll = editorScrollRef.current
+    scheduleSaveLastWorkspaceState({
+      rootFolderPath: folders.find((folder) => folder.id === file.rootFolderId)?.path,
+      selectedFolderPath: file.parentFolderPath,
+      selectedFilePath: file.path,
+      rightEditorScrollTop: scroll?.scrollTop ?? 0,
+      rightEditorScrollHeight: scroll?.scrollHeight ?? 0,
+      rightEditorClientHeight: scroll?.clientHeight ?? 0,
+      editorMode: isEditing ? 'editing' : 'readonly',
+    })
+  }, [file?.path, isEditing, folders, scheduleSaveLastWorkspaceState])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -403,9 +463,28 @@ export function EditorPane() {
     if (!file?.editable) return
     pendingEditAnchorRef.current = anchor ?? null
     setEditorVisualReadyFileId(null)
-    void loadFileContent(file.id, file.path, file.kind).then(() => {
+    void ensureFullFileLoaded(file)
+      .then((fullContent) => {
+        useEditorStore.getState().hydrateContentAsSaved(file.id, file.path, fullContent)
+      })
+      .then(() => loadFileContent(file.id, file.path, file.kind))
+      .then(() => {
       setEditingFileId(file.id)
     })
+  }
+
+  const ensureCurrentFullContent = () => {
+    if (!file?.editable || file.kind === 'image') return
+    if (fullFileEntry?.content) return
+    void ensureFullFileLoaded(file)
+      .then((fullContent) => {
+        const state = useEditorStore.getState()
+        const isDirty = state.activeFileId === file.id && state.saveStatus === 'dirty'
+        if (!isDirty) state.hydrateContentAsSaved(file.id, file.path, fullContent)
+      })
+      .catch((error) => {
+        if (import.meta.env.DEV) console.warn('[full-load:failed]', { path: file.path, error })
+      })
   }
 
   const updateEditorContent = (id: string, markdown: string) => {
@@ -567,8 +646,20 @@ export function EditorPane() {
 
   const handleEditorScroll = () => {
     const scroll = editorScrollRef.current
-    if (!scroll || !file || isEditing || file.kind === 'image') return
-    updateReadonlyScrollTop(file, scroll.scrollTop)
+    if (!scroll || !file || file.kind === 'image') return
+    if (!isEditing) updateReadonlyScrollTop(file, scroll.scrollTop)
+    updateFullFileScrollTop(file, scroll.scrollTop)
+    scheduleSaveLastWorkspaceState({
+      rootFolderPath: folders.find((folder) => folder.id === file.rootFolderId)?.path,
+      selectedFolderPath: file.parentFolderPath,
+      selectedFilePath: file.path,
+      rightEditorScrollTop: scroll.scrollTop,
+      rightEditorScrollHeight: scroll.scrollHeight,
+      rightEditorClientHeight: scroll.clientHeight,
+      editorMode: isEditing ? 'editing' : 'readonly',
+    })
+
+    if (isEditing) return
 
     const isUserScroll = Date.now() - lastUserScrollIntentAtRef.current < 1500
     if (!isUserScroll) return
@@ -793,6 +884,7 @@ export function EditorPane() {
           onPointerDownCapture={markUserScrollIntent}
           onContextMenu={handleEditorContextMenu}
           onClickCapture={handleEditorClick}
+          onPointerEnter={ensureCurrentFullContent}
         >
           <div className="note-created-time">{formatDisplayTime(file.createdAt ?? file.updatedAt ?? new Date().toISOString())}</div>
           {file.kind === 'image' ? (
@@ -833,7 +925,12 @@ export function EditorPane() {
                     />
                   </div>
                 ) : (
-                  <div className="readonly-skeleton">正在加载文档…</div>
+                  <ReadonlyChunkViewer
+                    file={file}
+                    entry={readonlyEntry}
+                    editable={file.editable}
+                    onEnterEdit={enterEditing}
+                  />
                 )
               ) : file.editable && isTextCodeFile ? (
                 fullContentLoaded ? (

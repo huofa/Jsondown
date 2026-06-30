@@ -22,9 +22,16 @@ export type OpenedFileCacheEntry = {
   error?: string
 }
 
+export type OpenReadonlyFileOptions = {
+  startByte?: number
+  maxBytes?: number
+  scrollTop?: number
+  force?: boolean
+}
+
 type OpenedFileCacheStore = {
   entries: Record<string, OpenedFileCacheEntry>
-  openReadonlyFile: (file: EditableFile) => Promise<void>
+  openReadonlyFile: (file: EditableFile, options?: OpenReadonlyFileOptions) => Promise<void>
   loadNextReadonlyChunk: (file: EditableFile) => Promise<void>
   ensureReadonlyBytes: (file: EditableFile, minBytes: number) => Promise<void>
   updateScrollTop: (file: EditableFile, scrollTop: number) => void
@@ -45,11 +52,11 @@ const pruneEntries = (entries: Record<string, OpenedFileCacheEntry>) => {
 export const useOpenedFileCacheStore = create<OpenedFileCacheStore>((set, get) => ({
   entries: {},
   getCacheKey,
-  openReadonlyFile: async (file) => {
+  openReadonlyFile: async (file, options = {}) => {
     const key = getCacheKey(file)
     const now = Date.now()
     const current = get().entries[key]
-    if (current?.mode === 'readonly' || current?.mode === 'readonly-loading') {
+    if (!options.force && (current?.mode === 'readonly' || current?.mode === 'readonly-loading')) {
       set((state) => ({
         entries: {
           ...state.entries,
@@ -69,9 +76,9 @@ export const useOpenedFileCacheStore = create<OpenedFileCacheStore>((set, get) =
           createdAt: file.createdAt,
           mode: 'readonly-loading',
           readonlyChunks: [],
-          readonlyLoadedBytes: 0,
+          readonlyLoadedBytes: options.startByte ?? 0,
           readonlyEof: false,
-          scrollTop: 0,
+          scrollTop: options.scrollTop ?? 0,
           lastOpenedAt: now,
           lastAccessedAt: now,
         },
@@ -79,7 +86,12 @@ export const useOpenedFileCacheStore = create<OpenedFileCacheStore>((set, get) =
     }))
 
     try {
-      const chunk = await readFileChunk(file.path, 0, FIRST_CHUNK_SIZE, file.id)
+      const chunk = await readFileChunk(
+        file.path,
+        options.startByte ?? 0,
+        options.maxBytes ?? FIRST_CHUNK_SIZE,
+        file.id,
+      )
       set((state) => {
         const entry = state.entries[key]
         if (!entry) return state
