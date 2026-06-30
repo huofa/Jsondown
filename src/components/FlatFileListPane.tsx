@@ -16,6 +16,9 @@ import {
   isTauriRuntime,
   moveToRecentlyDeleted as movePathToRecentlyDeleted,
   revealInFinder,
+  searchWorkspace,
+  type FilePreviewPayload,
+  type WorkspaceSearchResult,
 } from '../services/tauriFileService'
 import type { EditableFile, SortMode } from '../types/file'
 import { findParentFolderId, getDirectFilesForSelection, getFolderSelection } from '../utils/folderSelection'
@@ -36,6 +39,44 @@ const sortLabels: Record<SortMode, string> = {
   'name-desc': '文件名 Z-A',
   path: '路径',
 }
+
+const SEARCHABLE_TEXT_EXTENSIONS = new Set([
+  'md',
+  'markdown',
+  'txt',
+  'text',
+  'json',
+  'yaml',
+  'yml',
+  'html',
+  'htm',
+  'css',
+  'js',
+  'jsx',
+  'ts',
+  'tsx',
+])
+
+type SearchAnchorDetail = {
+  fileId: string
+  query: string
+  matchText: string
+  firstMatchLine: number
+  firstMatchColumn: number
+  firstMatchByte: number
+}
+
+const sortFiles = (files: EditableFile[], sortMode: SortMode) =>
+  [...files].sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+    if (sortMode === 'updatedAt-desc') return (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')
+    if (sortMode === 'updatedAt-asc') return (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')
+    if (sortMode === 'createdAt-desc') return (b.createdAt ?? '').localeCompare(a.createdAt ?? '')
+    if (sortMode === 'createdAt-asc') return (a.createdAt ?? '').localeCompare(b.createdAt ?? '')
+    if (sortMode === 'path') return a.path.localeCompare(b.path, 'zh-CN')
+    if (sortMode === 'name-desc') return b.name.localeCompare(a.name, 'zh-CN')
+    return a.name.localeCompare(b.name, 'zh-CN')
+  })
 
 export function FlatFileListPane() {
   const folders = useRootFolderStore((state) => state.folders)
@@ -63,6 +104,8 @@ export function FlatFileListPane() {
   const [sortOpen, setSortOpen] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; file: EditableFile } | null>(null)
   const [renameTarget, setRenameTarget] = useState<EditableFile | null>(null)
+  const [searchResults, setSearchResults] = useState<WorkspaceSearchResult[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
   const sortRef = useRef<HTMLDivElement>(null)
   const fileCardRefs = useRef(new Map<string, HTMLDivElement>())
@@ -75,14 +118,43 @@ export function FlatFileListPane() {
     () => folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id)),
     [folders],
   )
-
-  const files = useMemo(() => {
+  const selectedRoot = folders.find((folder) => folder.id === activeFolderId)
+  const selectedPath = isAllFiles
+    ? null
+    : selectedRoot?.path ?? (selectedFolder?.id && selectedFolder.id !== 'recently-deleted' ? selectedFolder.id : null)
+  const defaultSourceFiles = useMemo(() => {
+    if (isRecentlyDeleted) return []
+    return isAllFiles
+      ? allFiles
+      : getDirectFilesForSelection(folders, activeFolderId)
+  }, [activeFolderId, allFiles, folders, isAllFiles, isRecentlyDeleted])
+  const searchScopeFiles = useMemo(() => {
     if (isRecentlyDeleted) return []
     const source = isAllFiles
       ? allFiles
-      : getDirectFilesForSelection(folders, activeFolderId)
+      : allFiles.filter((file) => selectedPath && (
+        file.path === selectedPath || file.path.startsWith(`${selectedPath}/`)
+      ))
+    return source.filter((file) => SEARCHABLE_TEXT_EXTENSIONS.has(file.extension.toLowerCase()))
+  }, [allFiles, isAllFiles, isRecentlyDeleted, selectedPath])
+
+  const files = useMemo(() => {
+    if (isRecentlyDeleted) return []
     const needle = query.trim().toLocaleLowerCase()
-    return source
+    if (needle) {
+      const byPath = new Map(allFiles.map((file) => [file.path, file]))
+      const resultByPath = new Map(searchResults.map((result) => [result.path, result]))
+      const matched = searchResults
+        .map((result) => byPath.get(result.path))
+        .filter(Boolean) as EditableFile[]
+      return sortFiles(matched, sortMode)
+        .sort((a, b) => {
+          const aRank = resultByPath.get(a.path)?.matchType === 'exact' ? 0 : 1
+          const bRank = resultByPath.get(b.path)?.matchType === 'exact' ? 0 : 1
+          return aRank - bRank
+        })
+    }
+    return sortFiles(defaultSourceFiles
       .filter((file) => {
         const preview = previews[getPreviewKey(file)]?.preview
         const previewText = `${preview?.title ?? ''} ${preview?.summary ?? ''}`.toLocaleLowerCase()
@@ -91,23 +163,57 @@ export function FlatFileListPane() {
           || file.relativePath.toLocaleLowerCase().includes(needle)
           || previewText.includes(needle)
       })
-      .sort((a, b) => {
-        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
-        if (sortMode === 'updatedAt-desc') return (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')
-        if (sortMode === 'updatedAt-asc') return (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')
-        if (sortMode === 'createdAt-desc') return (b.createdAt ?? '').localeCompare(a.createdAt ?? '')
-        if (sortMode === 'createdAt-asc') return (a.createdAt ?? '').localeCompare(b.createdAt ?? '')
-        if (sortMode === 'path') return a.path.localeCompare(b.path, 'zh-CN')
-        if (sortMode === 'name-desc') return b.name.localeCompare(a.name, 'zh-CN')
-        return a.name.localeCompare(b.name, 'zh-CN')
+    , sortMode)
+  }, [allFiles, defaultSourceFiles, getPreviewKey, isRecentlyDeleted, previews, query, searchResults, sortMode])
+  const searchPreviewByPath = useMemo(() => {
+    const map = new Map<string, FilePreviewPayload>()
+    searchResults.forEach((result) => {
+      map.set(result.path, {
+        path: result.path,
+        title: result.name,
+        summary: result.snippet || `第 ${result.firstMatchLine} 行命中`,
+        updatedAt: result.updatedAt,
       })
-  }, [activeFolderId, allFiles, folders, getPreviewKey, isAllFiles, isRecentlyDeleted, previews, query, sortMode])
+    })
+    return map
+  }, [searchResults])
 
   useEffect(() => {
-    if (isRecentlyDeleted) return
+    const value = query.trim()
+    if (!value || isRecentlyDeleted) {
+      setSearchResults([])
+      setSearchLoading(false)
+      return
+    }
+
+    let disposed = false
+    setSearchLoading(true)
+    setSearchResults([])
+    const timer = window.setTimeout(() => {
+      void searchWorkspace(searchScopeFiles.map((file) => file.path), value)
+        .then((results) => {
+          if (!disposed) setSearchResults(results)
+        })
+        .catch((error) => {
+          if (import.meta.env.DEV) console.warn('[workspace-search:failed]', error)
+          if (!disposed) setSearchResults([])
+        })
+        .finally(() => {
+          if (!disposed) setSearchLoading(false)
+        })
+    }, 180)
+
+    return () => {
+      disposed = true
+      window.clearTimeout(timer)
+    }
+  }, [isRecentlyDeleted, query, searchScopeFiles])
+
+  useEffect(() => {
+    if (isRecentlyDeleted || query.trim()) return
     ensurePreviews(files, 0, FIRST_PREVIEW_COUNT)
     ensurePreviews(files, Math.max(0, files.length - LAST_PREVIEW_COUNT), LAST_PREVIEW_COUNT)
-  }, [ensurePreviews, files, isRecentlyDeleted])
+  }, [ensurePreviews, files, isRecentlyDeleted, query])
 
   useEffect(() => {
     setQuery('')
@@ -181,7 +287,7 @@ export function FlatFileListPane() {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder={isAllFiles ? '搜索文件名或已加载摘要' : `搜索“${title}”或已加载摘要`}
+              placeholder={isAllFiles ? '搜索全部文件内容' : `搜索“${title}”下的文件内容`}
             />
           </label>
           <div className="sort-control" ref={sortRef}>
@@ -218,8 +324,8 @@ export function FlatFileListPane() {
                 >
                   <FileCard
                     file={file}
-                    preview={preview?.preview}
-                    previewStatus={preview?.status}
+                    preview={query.trim() ? searchPreviewByPath.get(file.path) : preview?.preview}
+                    previewStatus={query.trim() ? (searchLoading ? 'loading' : 'idle') : preview?.status}
                     selected={activeFileId === file.id}
                     showParentFolder={isAllFiles}
                     onOpen={() => {
@@ -229,7 +335,20 @@ export function FlatFileListPane() {
                       }
                       const openTarget = () => {
                         if (!isAllFiles && file.rootFolderId) selectFolder(activeFolderId ?? file.rootFolderId)
-                        void requestOpenFile(file.id, allFiles)
+                        void requestOpenFile(file.id, allFiles).then((opened) => {
+                          const value = query.trim()
+                          const result = searchResults.find((item) => item.path === file.path)
+                          if (!opened || !value || !result) return
+                          const detail: SearchAnchorDetail = {
+                            fileId: file.id,
+                            query: value,
+                            matchText: value,
+                            firstMatchLine: result.firstMatchLine,
+                            firstMatchColumn: result.firstMatchColumn,
+                            firstMatchByte: result.firstMatchByte,
+                          }
+                          window.dispatchEvent(new CustomEvent('jsondown:workspace-search-open', { detail }))
+                        })
                       }
                       if (pendingEmptyFile?.id === file.id) {
                         openTarget()
