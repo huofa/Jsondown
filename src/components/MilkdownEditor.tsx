@@ -4,7 +4,7 @@ import { redoCommand, undoCommand } from '@milkdown/kit/plugin/history'
 import { toggleMark } from '@milkdown/prose/commands'
 import { TextSelection, type Selection } from '@milkdown/prose/state'
 import type { EditorView } from '@milkdown/prose/view'
-import { $markSchema, $remark } from '@milkdown/utils'
+import { $markSchema, $remark, insert } from '@milkdown/utils'
 import {
   insertHrCommand,
   insertImageCommand,
@@ -724,6 +724,20 @@ export function MilkdownEditor({
           case 'hr':
             result = commands.call(insertHrCommand.key)
             break
+
+          case 'metadata':
+            {
+              const { from, to } = view.state.selection
+              const selected = view.state.doc.textBetween(from, to)
+              if (selected) {
+                insert(`---\n${selected}\n---`)(ctx)
+                result = true
+              } else {
+                insert('---\n---')(ctx)
+                result = true
+              }
+            }
+            break
         }
 
         view.focus()
@@ -737,6 +751,18 @@ export function MilkdownEditor({
         const { from, to } = view.state.selection
 
         view.dispatch(view.state.tr.insertText(text, from, to))
+        rememberedSelection = view.state.selection
+        view.focus()
+        scheduleCaretRepaint()
+
+        return true
+      })
+
+    const insertMarkdown = (markdown: string) =>
+      crepe.editor.action((ctx) => {
+        restoreEditorSelection(ctx)
+        insert(markdown)(ctx)
+        const view = ctx.get(editorViewCtx)
         rememberedSelection = view.state.selection
         view.focus()
         scheduleCaretRepaint()
@@ -802,6 +828,7 @@ export function MilkdownEditor({
       onReadyRef.current?.({
         rememberSelection,
         insertText,
+        insertMarkdown,
         run,
         heading: (level) =>
           crepe.editor.action((ctx) => {

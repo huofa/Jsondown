@@ -15,10 +15,12 @@ export type EditorCommand =
   | 'code-block'
   | 'blockquote'
   | 'hr'
+  | 'metadata'
 
 export type EditorCommandApi = {
   rememberSelection: () => boolean
   insertText: (text: string) => boolean
+  insertMarkdown?: (markdown: string) => boolean
   run: (command: EditorCommand, payload?: string) => boolean
   heading: (level: number) => boolean
   applyColor: (textColor: string, backgroundColor: string) => boolean
