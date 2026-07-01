@@ -1,6 +1,6 @@
 [package]
 name = "jsondown"
-version = "1.6.3"
+version = "1.6.4"
 description = "Jsondown local Markdown editor"
 authors = ["huofa"]
 edition = "2021"

@@ -9,7 +9,7 @@ import { useRootFolderStore } from '../stores/rootFolderStore'
 import { useThemeStore } from '../stores/themeStore'
 import { useWorkspaceStateStore } from '../stores/workspaceStateStore'
 import { backupTextFile, openExternalUrl, revealInFinder, writeTextFile } from '../services/tauriFileService'
-import type { EditorCommandApi } from '../types/editorCommand'
+import type { EditorCommand, EditorCommandApi } from '../types/editorCommand'
 import { flattenFiles } from '../utils/flattenFiles'
 import { formatDisplayTime } from '../utils/formatDisplayTime'
 import { normalizeMarkdownForJsondown, type MarkdownNormalizeResult } from '../utils/markdownNormalize'
@@ -26,12 +26,15 @@ import { MarkdownOrganizeDialog } from './MarkdownOrganizeDialog'
 import { PlainTextCodeEditor, type PlainTextCodeEditorHandle } from './PlainTextCodeEditor'
 import { SidebarCollapseButton } from './SidebarCollapseButton'
 import { CODE_TEXT_EXTENSIONS, MARKDOWN_EXTENSIONS } from '../utils/fileFilters'
+import { applyPlainTextColor, applyPlainTextCommand, applyPlainTextHeading } from '../utils/plainTextMarkdownCommands'
 
 type TextTemplate = {
   id: string
   name: string
   content: string
 }
+
+type ActiveEditorTarget = 'document' | 'template'
 
 type EditorContextMenuState = {
   x: number
@@ -59,6 +62,11 @@ type PendingSessionRestore = {
 const textTemplateStorageKey = 'jsondown:text-templates'
 
 const defaultTextTemplates: TextTemplate[] = [
+  {
+    id: 'md-basic',
+    name: 'MD 基础模板',
+    content: '# 标题\n\n---\n---\n\n正文内容\n\n- 列表项\n',
+  },
   {
     id: 'json-basic',
     name: 'JSON 基础模板',
@@ -129,6 +137,7 @@ export function EditorPane() {
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null)
   const [templateName, setTemplateName] = useState('')
   const [templateContent, setTemplateContent] = useState('')
+  const [activeEditorTarget, setActiveEditorTarget] = useState<ActiveEditorTarget>('document')
   const [organizeResult, setOrganizeResult] = useState<MarkdownNormalizeResult | null>(null)
   const [organizing, setOrganizing] = useState(false)
   const [editorVisualReadyFileId, setEditorVisualReadyFileId] = useState<string | null>(null)
@@ -138,6 +147,8 @@ export function EditorPane() {
   const [documentSearchActiveIndex, setDocumentSearchActiveIndex] = useState(0)
   const [documentSearchCount, setDocumentSearchCount] = useState(0)
   const textTemplateMenuRef = useRef<HTMLDivElement>(null)
+  const templateTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const templateSelectionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 })
   const documentSearchInputRef = useRef<HTMLInputElement>(null)
   const plainTextEditorRef = useRef<PlainTextCodeEditorHandle>(null)
   const saveTimer = useRef<number | undefined>(undefined)
@@ -360,14 +371,14 @@ export function EditorPane() {
   useEffect(() => {
     if (!textTemplateOpen) return
     const close = (event: MouseEvent) => {
-      if (!textTemplateMenuRef.current?.contains(event.target as Node)) setTextTemplateOpen(false)
+      const target = event.target as Node
+      if (textTemplateMenuRef.current?.contains(target)) return
+      if (target instanceof Element && target.closest('.top-editor-toolbar, .toolbar-floating-menu')) return
+      setTextTemplateOpen(false)
     }
-    const closeOnBlur = () => setTextTemplateOpen(false)
     window.addEventListener('mousedown', close)
-    window.addEventListener('blur', closeOnBlur)
     return () => {
       window.removeEventListener('mousedown', close)
-      window.removeEventListener('blur', closeOnBlur)
     }
   }, [textTemplateOpen])
 
@@ -615,7 +626,89 @@ export function EditorPane() {
     window.setTimeout(scheduleRestoreScroll, 120)
   }
 
+  const rememberTemplateEditorSelection = () => {
+    const textarea = templateTextareaRef.current
+    if (!textarea) return false
+    templateSelectionRef.current = {
+      start: textarea.selectionStart,
+      end: textarea.selectionEnd,
+    }
+    setActiveEditorTarget('template')
+    return true
+  }
+
+  const applyTemplateTextResult = (nextContent: string, start: number, end: number) => {
+    setTemplateContent(nextContent)
+    window.requestAnimationFrame(() => {
+      const textarea = templateTextareaRef.current
+      if (!textarea) return
+      textarea.focus()
+      textarea.setSelectionRange(start, end)
+      templateSelectionRef.current = { start, end }
+      setActiveEditorTarget('template')
+    })
+    return true
+  }
+
+  const getTemplateSelection = () => {
+    const textarea = templateTextareaRef.current
+    return {
+      start: templateSelectionRef.current.start ?? textarea?.selectionStart ?? 0,
+      end: templateSelectionRef.current.end ?? textarea?.selectionEnd ?? templateSelectionRef.current.start ?? 0,
+    }
+  }
+
+  const templateEditorApi = useMemo<EditorCommandApi>(() => ({
+    rememberSelection: rememberTemplateEditorSelection,
+    insertText: (text: string) => {
+      const selection = getTemplateSelection()
+      const nextContent = `${templateContent.slice(0, selection.start)}${text}${templateContent.slice(selection.end)}`
+      const nextCursor = selection.start + text.length
+      return applyTemplateTextResult(nextContent, nextCursor, nextCursor)
+    },
+    run: (command: EditorCommand, payload?: string) => {
+      if (command === 'undo' || command === 'redo') return false
+      const result = applyPlainTextCommand(templateContent, getTemplateSelection(), command, payload)
+      return applyTemplateTextResult(result.value, result.selection.start, result.selection.end)
+    },
+    heading: (level: number) => {
+      const result = applyPlainTextHeading(templateContent, getTemplateSelection(), level)
+      return applyTemplateTextResult(result.value, result.selection.start, result.selection.end)
+    },
+    applyColor: (textColor: string, backgroundColor: string) => {
+      const result = applyPlainTextColor(templateContent, getTemplateSelection(), textColor, backgroundColor)
+      return applyTemplateTextResult(result.value, result.selection.start, result.selection.end)
+    },
+  }), [templateContent])
+
+  const plainTextEditorApi = useMemo<EditorCommandApi | null>(() => {
+    if (!isTextCodeFile) return null
+    return {
+      rememberSelection: () => plainTextEditorRef.current?.rememberSelection() ?? false,
+      insertText: (text: string) => plainTextEditorRef.current?.insertText(text) ?? false,
+      run: (command, payload) => plainTextEditorRef.current?.run(command, payload) ?? false,
+      heading: (level) => plainTextEditorRef.current?.heading(level) ?? false,
+      applyColor: (textColor, backgroundColor) =>
+        plainTextEditorRef.current?.applyColor(textColor, backgroundColor) ?? false,
+    }
+  }, [isTextCodeFile])
+
+  const activeToolbarApi = templateEditorOpen && activeEditorTarget === 'template'
+    ? templateEditorApi
+    : isTextCodeFile
+      ? plainTextEditorApi
+      : editorApi
+
+  const activateDocumentEditor = () => {
+    setActiveEditorTarget('document')
+    if (textTemplateOpen) setTextTemplateOpen(false)
+  }
+
   const rememberTemplateSelection = () => {
+    if (templateEditorOpen && activeEditorTarget === 'template') {
+      templateEditorApi.rememberSelection()
+      return
+    }
     if (isTextCodeFile) {
       plainTextEditorRef.current?.rememberSelection()
       return
@@ -640,7 +733,7 @@ export function EditorPane() {
 
     const inserted = isTextCodeFile
       ? plainTextEditorRef.current?.insertText(template.content)
-      : editorApi?.insertText(template.content)
+      : (editorApi?.insertMarkdown?.(template.content) ?? editorApi?.insertText(template.content))
 
     if (!inserted) {
       showToast('请先定位光标')
@@ -655,6 +748,9 @@ export function EditorPane() {
     setTemplateName('')
     setTemplateContent('')
     setTemplateEditorOpen(true)
+    setActiveEditorTarget('template')
+    templateSelectionRef.current = { start: 0, end: 0 }
+    window.requestAnimationFrame(() => templateTextareaRef.current?.focus())
   }
 
   const startEditTemplate = (template: TextTemplate) => {
@@ -662,6 +758,9 @@ export function EditorPane() {
     setTemplateName(template.name)
     setTemplateContent(template.content)
     setTemplateEditorOpen(true)
+    setActiveEditorTarget('template')
+    templateSelectionRef.current = { start: 0, end: 0 }
+    window.requestAnimationFrame(() => templateTextareaRef.current?.focus())
   }
 
   const saveTextTemplate = () => {
@@ -825,7 +924,7 @@ export function EditorPane() {
         >
           <SquarePen size={15} />
         </button>
-        <TopEditorToolbar api={editorApi} disabled={!file?.editable || !isEditing || isTextCodeFile} />
+        <TopEditorToolbar api={activeToolbarApi} disabled={!file?.editable || !isEditing || !activeToolbarApi} />
         <div className="editor-actions">
           <div className="density-switcher text-template-tools" ref={textTemplateMenuRef}>
             <button
@@ -863,8 +962,16 @@ export function EditorPane() {
                       onChange={(event) => setTemplateName(event.currentTarget.value)}
                     />
                     <textarea
+                      ref={templateTextareaRef}
                       value={templateContent}
                       placeholder="模板内容"
+                      onFocus={() => {
+                        setActiveEditorTarget('template')
+                        rememberTemplateEditorSelection()
+                      }}
+                      onClick={rememberTemplateEditorSelection}
+                      onKeyUp={rememberTemplateEditorSelection}
+                      onSelect={rememberTemplateEditorSelection}
                       onChange={(event) => setTemplateContent(event.currentTarget.value)}
                     />
                     <div className="text-template-editor-actions">
@@ -974,7 +1081,10 @@ export function EditorPane() {
           onScroll={handleEditorScroll}
           onWheelCapture={markUserScrollIntent}
           onTouchMoveCapture={markUserScrollIntent}
-          onPointerDownCapture={markUserScrollIntent}
+          onPointerDownCapture={() => {
+            markUserScrollIntent()
+            activateDocumentEditor()
+          }}
           onContextMenu={handleEditorContextMenu}
           onClickCapture={handleEditorClick}
           onPointerEnter={() => {

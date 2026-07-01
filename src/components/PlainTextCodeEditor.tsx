@@ -1,8 +1,13 @@
 import { forwardRef, useImperativeHandle, useLayoutEffect, useRef } from 'react'
+import type { EditorCommand } from '../types/editorCommand'
+import { applyPlainTextColor, applyPlainTextCommand, applyPlainTextHeading } from '../utils/plainTextMarkdownCommands'
 
 export type PlainTextCodeEditorHandle = {
   rememberSelection: () => boolean
   insertText: (text: string) => boolean
+  run: (command: EditorCommand, payload?: string) => boolean
+  heading: (level: number) => boolean
+  applyColor: (textColor: string, backgroundColor: string) => boolean
   focusStart: () => boolean
 }
 
@@ -109,9 +114,52 @@ export const PlainTextCodeEditor = forwardRef<PlainTextCodeEditorHandle, PlainTe
       return true
     }
 
+    const applyTextResult = (nextValue: string, start: number, end: number) => {
+      const textarea = textareaRef.current
+      if (!textarea || readOnly) return false
+
+      onChange(nextValue)
+
+      window.requestAnimationFrame(() => {
+        textarea.focus()
+        textarea.setSelectionRange(start, end)
+        resizeToContent()
+        selectionRef.current = { start, end }
+      })
+
+      return true
+    }
+
+    const getSelection = () => {
+      const textarea = textareaRef.current
+      const savedSelection = selectionRef.current
+      const start = savedSelection?.start ?? textarea?.selectionStart ?? 0
+      const end = savedSelection?.end ?? textarea?.selectionEnd ?? start
+      return { start, end }
+    }
+
+    const run = (command: EditorCommand, payload?: string) => {
+      if (command === 'undo' || command === 'redo') return false
+      const result = applyPlainTextCommand(value, getSelection(), command, payload)
+      return applyTextResult(result.value, result.selection.start, result.selection.end)
+    }
+
+    const heading = (level: number) => {
+      const result = applyPlainTextHeading(value, getSelection(), level)
+      return applyTextResult(result.value, result.selection.start, result.selection.end)
+    }
+
+    const applyColor = (textColor: string, backgroundColor: string) => {
+      const result = applyPlainTextColor(value, getSelection(), textColor, backgroundColor)
+      return applyTextResult(result.value, result.selection.start, result.selection.end)
+    }
+
     useImperativeHandle(ref, () => ({
       rememberSelection,
       insertText,
+      run,
+      heading,
+      applyColor,
       focusStart,
     }))
 

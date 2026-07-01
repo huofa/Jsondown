@@ -3,6 +3,7 @@ import {
   Braces,
   CheckSquare,
   Code2,
+  FileText,
   Image,
   Italic,
   Link,
@@ -36,6 +37,7 @@ const commandButtons: { command: EditorCommand; label: string; icon: typeof Bold
   { command: 'ordered-list', label: '有序列表', icon: ListOrdered },
   { command: 'task-list', label: '任务列表', icon: CheckSquare },
   { command: 'table', label: '表格', icon: Table2 },
+  { command: 'metadata', label: '元数据', icon: FileText },
   { command: 'code-block', label: '代码块', icon: Braces },
   { command: 'blockquote', label: '引用', icon: Quote },
   { command: 'hr', label: '分割线', icon: Minus },
@@ -64,6 +66,7 @@ export function TopEditorToolbar({ api, disabled }: TopEditorToolbarProps) {
   const keepSelection = (event: MouseEvent) => {
     api?.rememberSelection()
     event.preventDefault()
+    event.stopPropagation()
   }
 
   useEffect(() => {
