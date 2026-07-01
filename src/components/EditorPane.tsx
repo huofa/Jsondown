@@ -140,6 +140,9 @@ export function EditorPane() {
   const previousActiveFileIdRef = useRef<string | null>(null)
   const lastUserScrollIntentAtRef = useRef(0)
   const sessionRestoreAppliedPathRef = useRef<string | null>(null)
+  const rightPanePointerInsideRef = useRef(false)
+  const rightPaneInitialLoadStartedAtRef = useRef(0)
+  const rightPaneFullLoadTimerRef = useRef<number | undefined>(undefined)
 
   const allFiles = useMemo(
     () => folders.flatMap((folder) => flattenFiles(folder.tree ?? [], folder.path, folder.id)),
@@ -181,6 +184,8 @@ export function EditorPane() {
 
   useEffect(() => {
     if (!file) return
+    rightPaneInitialLoadStartedAtRef.current = Date.now()
+    window.clearTimeout(rightPaneFullLoadTimerRef.current)
     if (pendingEmptyFile?.id === file.id) {
       setEditingFileId(file.id)
       void loadFileContent(file.id, file.path, file.kind)
@@ -481,12 +486,26 @@ export function EditorPane() {
     void ensureFullFileLoaded(file)
       .then((fullContent) => {
         const state = useEditorStore.getState()
+        if (state.activeFileId !== file.id || !rightPanePointerInsideRef.current) return
         const isDirty = state.activeFileId === file.id && state.saveStatus === 'dirty'
         if (!isDirty) state.hydrateContentAsSaved(file.id, file.path, fullContent)
       })
       .catch((error) => {
         if (import.meta.env.DEV) console.warn('[full-load:failed]', { path: file.path, error })
       })
+  }
+
+  const scheduleCurrentFullContentLoad = () => {
+    window.clearTimeout(rightPaneFullLoadTimerRef.current)
+    if (!rightPanePointerInsideRef.current) return
+    const initialRemainingMs = Math.max(
+      0,
+      rightPaneInitialLoadStartedAtRef.current + 500 - Date.now(),
+    )
+    rightPaneFullLoadTimerRef.current = window.setTimeout(() => {
+      if (!rightPanePointerInsideRef.current) return
+      ensureCurrentFullContent()
+    }, initialRemainingMs + 1000)
   }
 
   const updateEditorContent = (id: string, markdown: string) => {
@@ -886,7 +905,14 @@ export function EditorPane() {
           onPointerDownCapture={markUserScrollIntent}
           onContextMenu={handleEditorContextMenu}
           onClickCapture={handleEditorClick}
-          onPointerEnter={ensureCurrentFullContent}
+          onPointerEnter={() => {
+            rightPanePointerInsideRef.current = true
+            scheduleCurrentFullContentLoad()
+          }}
+          onPointerLeave={() => {
+            rightPanePointerInsideRef.current = false
+            window.clearTimeout(rightPaneFullLoadTimerRef.current)
+          }}
         >
           <div className="note-created-time">{formatDisplayTime(file.createdAt ?? file.updatedAt ?? new Date().toISOString())}</div>
           {file.kind === 'image' ? (

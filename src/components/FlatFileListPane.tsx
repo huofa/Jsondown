@@ -1,17 +1,12 @@
 import { Check, ChevronDown, Search } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type UIEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useEditorStore } from '../stores/editorStore'
 import { useFileListStore } from '../stores/fileListStore'
 import {
-  FIRST_PREVIEW_COUNT,
-  LAST_PREVIEW_COUNT,
-  PAGE_SIZE,
-  PRELOAD_NEXT_PAGE_COUNT,
-  PRELOAD_PREVIOUS_PAGE_COUNT,
+  INITIAL_PREVIEW_WINDOW_MS,
   useFilePreviewStore,
 } from '../stores/filePreviewStore'
 import { useRecentlyDeletedStore } from '../stores/recentlyDeletedStore'
-import { useOpenedFileCacheStore } from '../stores/openedFileCacheStore'
 import { useRootFolderStore } from '../stores/rootFolderStore'
 import {
   isTauriRuntime,
@@ -25,7 +20,6 @@ import type { EditableFile, SortMode } from '../types/file'
 import { findParentFolderId, getDirectFilesForSelection, getFolderSelection } from '../utils/folderSelection'
 import { flattenFiles } from '../utils/flattenFiles'
 import { startWindowDrag } from '../utils/windowDrag'
-import { CODE_TEXT_EXTENSIONS, MARKDOWN_EXTENSIONS } from '../utils/fileFilters'
 import { ContextMenu } from './ContextMenu'
 import { FileCard } from './FileCard'
 import { RecentlyDeletedPane } from './RecentlyDeletedPane'
@@ -58,6 +52,9 @@ const SEARCHABLE_TEXT_EXTENSIONS = new Set([
   'ts',
   'tsx',
 ])
+
+const MIDDLE_FULL_PREVIEW_BATCH_SIZE = 8
+const MIDDLE_FULL_PREVIEW_BATCH_DELAY_MS = 80
 
 type SearchAnchorDetail = {
   fileId: string
@@ -97,10 +94,10 @@ export function FlatFileListPane() {
   const removeContent = useEditorStore((state) => state.removeContent)
   const closeFile = useEditorStore((state) => state.closeFile)
   const previews = useFilePreviewStore((state) => state.previews)
-  const ensurePreviews = useFilePreviewStore((state) => state.ensurePreviews)
+  const ensurePreviewsForDuration = useFilePreviewStore((state) => state.ensurePreviewsForDuration)
+  const loadPreview = useFilePreviewStore((state) => state.loadPreview)
   const getPreviewKey = useFilePreviewStore((state) => state.getPreviewKey)
   const removePreview = useFilePreviewStore((state) => state.removePreview)
-  const preloadReadonlyFile = useOpenedFileCacheStore((state) => state.openReadonlyFile)
   const loadRecentlyDeleted = useRecentlyDeletedStore((state) => state.loadRecentlyDeleted)
   const moveToRecentlyDeleted = useRecentlyDeletedStore((state) => state.moveToRecentlyDeleted)
   const deletedCount = useRecentlyDeletedStore((state) => state.recentlyDeletedFiles.length)
@@ -112,7 +109,11 @@ export function FlatFileListPane() {
   const listRef = useRef<HTMLDivElement>(null)
   const sortRef = useRef<HTMLDivElement>(null)
   const fileCardRefs = useRef(new Map<string, HTMLDivElement>())
-  const candidatePreloadTimerRef = useRef<number | undefined>(undefined)
+  const middleFullLoadTimerRef = useRef<number | undefined>(undefined)
+  const middleFullLoadBatchTimerRef = useRef<number | undefined>(undefined)
+  const middleInitialLoadStartedAtRef = useRef(0)
+  const middlePointerInsideRef = useRef(false)
+  const middleFullLoadCursorRef = useRef(0)
 
   const selectedFolder = getFolderSelection(folders, activeFolderId)
   const isAllFiles = activeFolderId === 'all'
@@ -182,21 +183,41 @@ export function FlatFileListPane() {
     return map
   }, [searchResults])
 
-  const isCandidatePreloadFile = (file: EditableFile) => {
-    if (!file.editable || file.kind === 'image') return false
-    const extension = file.extension.toLowerCase()
-    return MARKDOWN_EXTENSIONS.has(extension) || CODE_TEXT_EXTENSIONS.has(extension)
+  const stopMiddleFullLoad = () => {
+    window.clearTimeout(middleFullLoadTimerRef.current)
+    window.clearTimeout(middleFullLoadBatchTimerRef.current)
   }
 
-  const preloadCandidateChunks = (candidates: EditableFile[]) => {
-    candidates
-      .filter(isCandidatePreloadFile)
-      .slice(0, 5)
-      .forEach((file) => {
-        void preloadReadonlyFile(file).catch((error) => {
-          if (import.meta.env.DEV) console.warn('[candidate-preload:failed]', { path: file.path, error })
-        })
-      })
+  const continueMiddleFullLoad = (sourceFiles = files) => {
+    if (isRecentlyDeleted || query.trim() || !middlePointerInsideRef.current) return
+
+    let count = 0
+    while (count < MIDDLE_FULL_PREVIEW_BATCH_SIZE && middleFullLoadCursorRef.current < sourceFiles.length) {
+      loadPreview(sourceFiles[middleFullLoadCursorRef.current])
+      middleFullLoadCursorRef.current += 1
+      count += 1
+    }
+
+    if (middlePointerInsideRef.current && middleFullLoadCursorRef.current < sourceFiles.length) {
+      middleFullLoadBatchTimerRef.current = window.setTimeout(
+        () => continueMiddleFullLoad(sourceFiles),
+        MIDDLE_FULL_PREVIEW_BATCH_DELAY_MS,
+      )
+    }
+  }
+
+  const scheduleMiddleFullLoad = (sourceFiles = files) => {
+    stopMiddleFullLoad()
+    if (isRecentlyDeleted || query.trim() || !middlePointerInsideRef.current) return
+
+    const initialRemainingMs = Math.max(
+      0,
+      middleInitialLoadStartedAtRef.current + INITIAL_PREVIEW_WINDOW_MS - Date.now(),
+    )
+    middleFullLoadTimerRef.current = window.setTimeout(() => {
+      if (!middlePointerInsideRef.current) return
+      continueMiddleFullLoad(sourceFiles)
+    }, initialRemainingMs + 1000)
   }
 
   useEffect(() => {
@@ -232,18 +253,12 @@ export function FlatFileListPane() {
 
   useEffect(() => {
     if (isRecentlyDeleted || query.trim()) return
-    ensurePreviews(files, 0, FIRST_PREVIEW_COUNT)
-    ensurePreviews(files, Math.max(0, files.length - LAST_PREVIEW_COUNT), LAST_PREVIEW_COUNT)
-  }, [ensurePreviews, files, isRecentlyDeleted, query])
-
-  useEffect(() => {
-    window.clearTimeout(candidatePreloadTimerRef.current)
-    if (isRecentlyDeleted || query.trim()) return
-    candidatePreloadTimerRef.current = window.setTimeout(() => {
-      preloadCandidateChunks(files.slice(0, 3))
-    }, 1000)
-    return () => window.clearTimeout(candidatePreloadTimerRef.current)
-  }, [files, isRecentlyDeleted, query])
+    middleFullLoadCursorRef.current = 0
+    middleInitialLoadStartedAtRef.current = Date.now()
+    ensurePreviewsForDuration(files, INITIAL_PREVIEW_WINDOW_MS)
+    scheduleMiddleFullLoad(files)
+    return stopMiddleFullLoad
+  }, [ensurePreviewsForDuration, files, isRecentlyDeleted, query])
 
   useEffect(() => {
     setQuery('')
@@ -266,22 +281,7 @@ export function FlatFileListPane() {
     }
   }, [sortOpen])
 
-  const handleListScroll = (event: UIEvent<HTMLDivElement>) => {
-    const target = event.currentTarget
-    const pageHeight = Math.max(target.clientHeight, 1)
-    const screen = Math.floor(target.scrollTop / pageHeight)
-    const currentPageStart = screen * PAGE_SIZE
-    ensurePreviews(files, currentPageStart - PAGE_SIZE, PRELOAD_PREVIOUS_PAGE_COUNT)
-    ensurePreviews(files, currentPageStart + PAGE_SIZE, PRELOAD_NEXT_PAGE_COUNT)
-
-    window.clearTimeout(candidatePreloadTimerRef.current)
-    if (!query.trim() && !isRecentlyDeleted) {
-      candidatePreloadTimerRef.current = window.setTimeout(() => {
-        const center = Math.max(0, Math.min(files.length - 1, currentPageStart + Math.floor(PAGE_SIZE / 2)))
-        preloadCandidateChunks(files.slice(Math.max(0, center - 2), center + 3))
-      }, 500)
-    }
-  }
+  const handleListScroll = () => {}
 
   const openMenu = (event: MouseEvent, file: EditableFile) => {
     event.preventDefault()
@@ -307,7 +307,17 @@ export function FlatFileListPane() {
   }, [activeFileId, activeFileIndex, activeFolderId, query, sortMode])
 
   return (
-    <div className="file-list-shell">
+    <div
+      className="file-list-shell"
+      onPointerEnter={() => {
+        middlePointerInsideRef.current = true
+        scheduleMiddleFullLoad(files)
+      }}
+      onPointerLeave={() => {
+        middlePointerInsideRef.current = false
+        stopMiddleFullLoad()
+      }}
+    >
       <header className="file-list-header" data-tauri-drag-region onPointerDownCapture={startWindowDrag}>
         <div className="file-list-title-zone" data-tauri-drag-region>
           <span className="eyebrow" data-tauri-drag-region>{isAllFiles ? '所有资料夹' : isRecentlyDeleted ? '删除缓冲区' : '当前资料夹'}</span>
