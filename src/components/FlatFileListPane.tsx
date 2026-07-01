@@ -11,6 +11,7 @@ import {
   useFilePreviewStore,
 } from '../stores/filePreviewStore'
 import { useRecentlyDeletedStore } from '../stores/recentlyDeletedStore'
+import { useOpenedFileCacheStore } from '../stores/openedFileCacheStore'
 import { useRootFolderStore } from '../stores/rootFolderStore'
 import {
   isTauriRuntime,
@@ -24,6 +25,7 @@ import type { EditableFile, SortMode } from '../types/file'
 import { findParentFolderId, getDirectFilesForSelection, getFolderSelection } from '../utils/folderSelection'
 import { flattenFiles } from '../utils/flattenFiles'
 import { startWindowDrag } from '../utils/windowDrag'
+import { CODE_TEXT_EXTENSIONS, MARKDOWN_EXTENSIONS } from '../utils/fileFilters'
 import { ContextMenu } from './ContextMenu'
 import { FileCard } from './FileCard'
 import { RecentlyDeletedPane } from './RecentlyDeletedPane'
@@ -98,6 +100,7 @@ export function FlatFileListPane() {
   const ensurePreviews = useFilePreviewStore((state) => state.ensurePreviews)
   const getPreviewKey = useFilePreviewStore((state) => state.getPreviewKey)
   const removePreview = useFilePreviewStore((state) => state.removePreview)
+  const preloadReadonlyFile = useOpenedFileCacheStore((state) => state.openReadonlyFile)
   const loadRecentlyDeleted = useRecentlyDeletedStore((state) => state.loadRecentlyDeleted)
   const moveToRecentlyDeleted = useRecentlyDeletedStore((state) => state.moveToRecentlyDeleted)
   const deletedCount = useRecentlyDeletedStore((state) => state.recentlyDeletedFiles.length)
@@ -109,6 +112,7 @@ export function FlatFileListPane() {
   const listRef = useRef<HTMLDivElement>(null)
   const sortRef = useRef<HTMLDivElement>(null)
   const fileCardRefs = useRef(new Map<string, HTMLDivElement>())
+  const candidatePreloadTimerRef = useRef<number | undefined>(undefined)
 
   const selectedFolder = getFolderSelection(folders, activeFolderId)
   const isAllFiles = activeFolderId === 'all'
@@ -178,6 +182,23 @@ export function FlatFileListPane() {
     return map
   }, [searchResults])
 
+  const isCandidatePreloadFile = (file: EditableFile) => {
+    if (!file.editable || file.kind === 'image') return false
+    const extension = file.extension.toLowerCase()
+    return MARKDOWN_EXTENSIONS.has(extension) || CODE_TEXT_EXTENSIONS.has(extension)
+  }
+
+  const preloadCandidateChunks = (candidates: EditableFile[]) => {
+    candidates
+      .filter(isCandidatePreloadFile)
+      .slice(0, 5)
+      .forEach((file) => {
+        void preloadReadonlyFile(file).catch((error) => {
+          if (import.meta.env.DEV) console.warn('[candidate-preload:failed]', { path: file.path, error })
+        })
+      })
+  }
+
   useEffect(() => {
     const value = query.trim()
     if (!value || isRecentlyDeleted) {
@@ -216,6 +237,15 @@ export function FlatFileListPane() {
   }, [ensurePreviews, files, isRecentlyDeleted, query])
 
   useEffect(() => {
+    window.clearTimeout(candidatePreloadTimerRef.current)
+    if (isRecentlyDeleted || query.trim()) return
+    candidatePreloadTimerRef.current = window.setTimeout(() => {
+      preloadCandidateChunks(files.slice(0, 3))
+    }, 1000)
+    return () => window.clearTimeout(candidatePreloadTimerRef.current)
+  }, [files, isRecentlyDeleted, query])
+
+  useEffect(() => {
     setQuery('')
     setSortOpen(false)
     setMenu(null)
@@ -243,6 +273,14 @@ export function FlatFileListPane() {
     const currentPageStart = screen * PAGE_SIZE
     ensurePreviews(files, currentPageStart - PAGE_SIZE, PRELOAD_PREVIOUS_PAGE_COUNT)
     ensurePreviews(files, currentPageStart + PAGE_SIZE, PRELOAD_NEXT_PAGE_COUNT)
+
+    window.clearTimeout(candidatePreloadTimerRef.current)
+    if (!query.trim() && !isRecentlyDeleted) {
+      candidatePreloadTimerRef.current = window.setTimeout(() => {
+        const center = Math.max(0, Math.min(files.length - 1, currentPageStart + Math.floor(PAGE_SIZE / 2)))
+        preloadCandidateChunks(files.slice(Math.max(0, center - 2), center + 3))
+      }, 500)
+    }
   }
 
   const openMenu = (event: MouseEvent, file: EditableFile) => {

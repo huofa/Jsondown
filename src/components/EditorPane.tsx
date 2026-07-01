@@ -197,7 +197,9 @@ export function EditorPane() {
       return
     }
     if (file.editable && isTextCodeFile) {
-      void loadFileContent(file.id, file.path, file.kind)
+      const restoreOptions = getRestoreOpenOptions()
+      if (restoreOptions?.force) sessionRestoreAppliedPathRef.current = file.path
+      void openReadonlyFile(file, restoreOptions)
       return
     }
     const restoreOptions = getRestoreOpenOptions()
@@ -953,7 +955,12 @@ export function EditorPane() {
                     />
                   </div>
                 ) : (
-                  <div className="readonly-skeleton">正在加载文档…</div>
+                  <ReadonlyChunkViewer
+                    file={file}
+                    entry={readonlyEntry}
+                    editable={file.editable}
+                    onEnterEdit={enterEditing}
+                  />
                 )
               ) : (
                 <ReadonlyChunkViewer
