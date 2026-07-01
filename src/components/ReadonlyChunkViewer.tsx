@@ -112,8 +112,8 @@ export function ReadonlyChunkViewer({ file, entry, editable, onEnterEdit }: Read
             {entry?.sizeBytes ? <span>{Math.ceil(entry.sizeBytes / 1024)} KB</span> : null}
           </div>
         )}
-        {!entry && <div className="readonly-skeleton">正在加载前四屏内容…</div>}
-        {entry?.mode === 'readonly-loading' && <div className="readonly-skeleton">正在加载前四屏内容…</div>}
+        {!entry && <div className="readonly-skeleton">正在加载…</div>}
+        {entry?.mode === 'readonly-loading' && <div className="readonly-skeleton">正在加载…</div>}
         {entry?.mode === 'error' && <div className="readonly-error">{entry.error ?? '读取失败'}</div>}
         {entry?.mode === 'readonly' && (shouldUseMarkdownRenderer
           ? <MarkdownRenderedViewer markdown={text} />
