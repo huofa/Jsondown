@@ -49,6 +49,13 @@ type WorkspaceSearchOpenDetail = {
   firstMatchByte: number
 }
 
+type PendingSessionRestore = {
+  path: string
+  scrollTop: number
+  ratio: number
+  appliedToFullContent: boolean
+}
+
 const textTemplateStorageKey = 'jsondown:text-templates'
 
 const defaultTextTemplates: TextTemplate[] = [
@@ -140,6 +147,7 @@ export function EditorPane() {
   const previousActiveFileIdRef = useRef<string | null>(null)
   const lastUserScrollIntentAtRef = useRef(0)
   const sessionRestoreAppliedPathRef = useRef<string | null>(null)
+  const pendingSessionRestoreRef = useRef<PendingSessionRestore | null>(null)
   const rightPanePointerInsideRef = useRef(false)
   const rightPaneInitialLoadStartedAtRef = useRef(0)
   const rightPaneFullLoadTimerRef = useRef<number | undefined>(undefined)
@@ -162,24 +170,72 @@ export function EditorPane() {
   const getRestoreOpenOptions = () => {
     if (!file || lastWorkspaceState?.selectedFilePath !== file.path) return undefined
     if (sessionRestoreAppliedPathRef.current === file.path) return undefined
+    const savedScrollTop = lastWorkspaceState.rightEditorScrollTop ?? 0
     const sizeBytes = file.size ?? 0
-    if (sizeBytes <= 0) return { scrollTop: lastWorkspaceState.rightEditorScrollTop ?? 0 }
+    if (sizeBytes <= 0) {
+      pendingSessionRestoreRef.current = {
+        path: file.path,
+        scrollTop: savedScrollTop,
+        ratio: 0,
+        appliedToFullContent: false,
+      }
+      return { scrollTop: savedScrollTop }
+    }
     const scrollableHeight = Math.max(
       0,
       (lastWorkspaceState.rightEditorScrollHeight ?? 0) - (lastWorkspaceState.rightEditorClientHeight ?? 0),
     )
     const ratio = scrollableHeight > 0
-      ? Math.max(0, Math.min(1, (lastWorkspaceState.rightEditorScrollTop ?? 0) / scrollableHeight))
+      ? Math.max(0, Math.min(1, savedScrollTop / scrollableHeight))
       : 0
     const screenBytes = 16 * 1024
     const beforeBytes = screenBytes * 4
     const afterBytes = screenBytes * 4
+    const startByte = Math.max(0, Math.floor(sizeBytes * ratio) - beforeBytes)
+    pendingSessionRestoreRef.current = {
+      path: file.path,
+      scrollTop: savedScrollTop,
+      ratio,
+      appliedToFullContent: false,
+    }
     return {
-      startByte: Math.max(0, Math.floor(sizeBytes * ratio) - beforeBytes),
+      startByte,
       maxBytes: beforeBytes + afterBytes,
-      scrollTop: lastWorkspaceState.rightEditorScrollTop ?? 0,
+      // session restore 的 chunk 已经从上次位置附近开始读，局部内容先从顶部展示；
+      // 等 full load 完成后，再用保存的绝对 scrollTop 恢复完整文档位置。
+      scrollTop: startByte > 0 ? 0 : savedScrollTop,
       force: true,
     }
+  }
+
+  const restorePendingSessionScroll = (source: 'chunk' | 'full') => {
+    const pending = pendingSessionRestoreRef.current
+    if (!pending || !file || pending.path !== file.path) return
+    if (source === 'full' && pending.appliedToFullContent) return
+    const scroll = editorScrollRef.current
+    if (!scroll) return
+
+    const apply = () => {
+      const current = editorScrollRef.current
+      const latestPending = pendingSessionRestoreRef.current
+      if (!current || !latestPending || !file || latestPending.path !== file.path) return
+      const maxTop = Math.max(0, current.scrollHeight - current.clientHeight)
+      const targetTop = source === 'full'
+        ? Math.min(maxTop, Math.max(0, latestPending.scrollTop || maxTop * latestPending.ratio))
+        : Math.min(maxTop, Math.max(0, current.scrollTop))
+      current.scrollTop = targetTop
+      if (source === 'full') {
+        pendingSessionRestoreRef.current = {
+          ...latestPending,
+          appliedToFullContent: true,
+        }
+      }
+    }
+
+    window.requestAnimationFrame(() => {
+      apply()
+      window.requestAnimationFrame(apply)
+    })
   }
 
   useEffect(() => {
@@ -224,6 +280,7 @@ export function EditorPane() {
     if (!scroll) return
     window.requestAnimationFrame(() => {
       scroll.scrollTop = readonlyEntry.scrollTop
+      restorePendingSessionScroll('chunk')
     })
   }, [file?.id, isEditing, readonlyEntry?.path, readonlyEntry?.readonlyLoadedBytes])
 
@@ -281,6 +338,8 @@ export function EditorPane() {
 
   useEffect(() => {
     if (!file) return
+    const pendingRestore = pendingSessionRestoreRef.current
+    if (pendingRestore?.path === file.path && !pendingRestore.appliedToFullContent) return
     const scroll = editorScrollRef.current
     scheduleSaveLastWorkspaceState({
       rootFolderPath: folders.find((folder) => folder.id === file.rootFolderId)?.path,
@@ -480,13 +539,15 @@ export function EditorPane() {
     })
   }
 
-  const ensureCurrentFullContent = () => {
+  const ensureCurrentFullContent = (options: { requirePointerInside?: boolean } = {}) => {
+    const requirePointerInside = options.requirePointerInside ?? true
     if (!file?.editable || file.kind === 'image') return
     if (fullFileEntry?.content) return
     void ensureFullFileLoaded(file)
       .then((fullContent) => {
         const state = useEditorStore.getState()
-        if (state.activeFileId !== file.id || !rightPanePointerInsideRef.current) return
+        if (state.activeFileId !== file.id) return
+        if (requirePointerInside && !rightPanePointerInsideRef.current) return
         const isDirty = state.activeFileId === file.id && state.saveStatus === 'dirty'
         if (!isDirty) state.hydrateContentAsSaved(file.id, file.path, fullContent)
       })
@@ -507,6 +568,17 @@ export function EditorPane() {
       ensureCurrentFullContent()
     }, initialRemainingMs + 1000)
   }
+
+  useEffect(() => {
+    if (!file?.editable || file.kind === 'image' || pendingEmptyFile?.id === file.id) return
+    ensureCurrentFullContent({ requirePointerInside: false })
+  }, [file?.id, file?.path, file?.updatedAt, pendingEmptyFile?.id])
+
+  useEffect(() => {
+    if (!file || !fullContentLoaded) return
+    if (isMarkdownFile && !editorVisualReady) return
+    restorePendingSessionScroll('full')
+  }, [editorVisualReady, file?.path, fullContentLoaded, isMarkdownFile])
 
   const updateEditorContent = (id: string, markdown: string) => {
     const scroll = editorScrollRef.current
