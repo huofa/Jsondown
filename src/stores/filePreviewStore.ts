@@ -2,12 +2,10 @@ import { create } from 'zustand'
 import { readFilePreview, type FilePreviewPayload } from '../services/tauriFileService'
 import type { EditableFile } from '../types/file'
 
-export const FIRST_PREVIEW_COUNT = 20
-export const LAST_PREVIEW_COUNT = 20
-export const PAGE_SIZE = 8
-export const PRELOAD_NEXT_PAGE_COUNT = 8
-export const PRELOAD_PREVIOUS_PAGE_COUNT = 8
 export const MAX_PREVIEW_CONCURRENCY = 3
+export const INITIAL_PREVIEW_WINDOW_MS = 500
+export const INITIAL_PREVIEW_BATCH_SIZE = 3
+export const INITIAL_PREVIEW_BATCH_DELAY_MS = 50
 
 export type FilePreviewStatus = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -28,6 +26,7 @@ type FilePreviewStore = {
   previews: Record<string, FilePreviewEntry>
   loadPreview: (file: EditableFile) => void
   ensurePreviews: (files: EditableFile[], start: number, count: number) => void
+  ensurePreviewsForDuration: (files: EditableFile[], durationMs: number) => void
   getPreviewKey: (file: EditableFile) => string
   removePreview: (path: string) => void
 }
@@ -107,6 +106,27 @@ export const useFilePreviewStore = create<FilePreviewStore>((set, get) => ({
   ensurePreviews: (files, start, count) => {
     const safeStart = Math.max(0, start)
     files.slice(safeStart, safeStart + count).forEach((file) => get().loadPreview(file))
+  },
+  ensurePreviewsForDuration: (files, durationMs) => {
+    const startedAt = Date.now()
+    let index = 0
+
+    const enqueueBatch = () => {
+      if (Date.now() - startedAt > durationMs || index >= files.length) return
+
+      let count = 0
+      while (count < INITIAL_PREVIEW_BATCH_SIZE && index < files.length) {
+        get().loadPreview(files[index])
+        index += 1
+        count += 1
+      }
+
+      if (Date.now() - startedAt <= durationMs && index < files.length) {
+        window.setTimeout(enqueueBatch, INITIAL_PREVIEW_BATCH_DELAY_MS)
+      }
+    }
+
+    enqueueBatch()
   },
   removePreview: (path) => {
     set((state) => ({
